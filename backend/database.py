@@ -1,10 +1,14 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# When running the backend inside a Docker container, the host should be 'db'
-# For now, we use 'localhost' as we run the script directly on the host
-SQLALCHEMY_DATABASE_URL = "postgresql://rezobd_user:rezobd_password@localhost:5432/rezo"
+POSTGRES_USER = os.getenv("POSTGRES_USER", "rezobd_user")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "rezobd_password")
+POSTGRES_SERVER = os.getenv("POSTGRES_SERVER", "localhost")
+POSTGRES_DB = os.getenv("POSTGRES_DB", "rezo")
+
+SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_SERVER}:5432/{POSTGRES_DB}"
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
