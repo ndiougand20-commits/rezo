@@ -22,8 +22,8 @@
 - [x] Commiter
 
 ## Étape 5 : Ajouter sélection type utilisateur et profils
-- [ ] Écran pour choisir type, puis création/édition de profil
-- [ ] Commiter
+- [x] Écran pour choisir type, puis création/édition de profil
+- [x] Commiter
 
 ## Étape 6 : Implémenter écrans de swipe
 - [ ] Swipe pour offres (étudiants) et formations (lycéens)
