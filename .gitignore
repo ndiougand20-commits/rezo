@@ -2,6 +2,7 @@
 # Generic
 .DS_Store
 Thumbs.db
+.postgres-data/
 
 # IDEs
 .idea/
