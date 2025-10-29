@@ -7,14 +7,14 @@
 - [x] Commiter les changements
 
 ## Étape 2 : Créer modèles Flutter
-- [ ] Créer classes Dart pour User, Student, HighSchooler, Company, University, Offer, Formation
-- [ ] Basées sur les schémas backend
-- [ ] Commiter
+- [x] Créer classes Dart pour User, Student, HighSchooler, Company, University, Offer, Formation
+- [x] Basées sur les schémas backend
+- [x] Commiter
 
 ## Étape 3 : Créer service API
-- [ ] Classe pour requêtes HTTP vers backend
-- [ ] Méthodes pour GET/POST vers localhost:8000
-- [ ] Commiter
+- [x] Classe pour requêtes HTTP vers backend
+- [x] Méthodes pour GET/POST vers localhost:8000
+- [x] Commiter
 
 ## Étape 4 : Implémenter authentification
 - [ ] Écrans login/register avec sélection type utilisateur
