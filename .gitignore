@@ -1,0 +1,67 @@
+
+# Generic
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+instance/
+*.cfg
+*.log
+*.pot
+*.pyc
+
+# Virtualenv
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Flutter
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.dart_tool/
+build/
+ios/Pods/
+ios/Flutter/App.framework
+ios/Flutter/engine.podspec
+android/app/src/main/assets/flutter_assets/
+android/app/build/
+android/app/intermediates/
+android/key.properties
+
+# macOS
+.symlinks/
+DerivedData/
