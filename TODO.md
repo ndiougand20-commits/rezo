@@ -17,9 +17,9 @@
 - [x] Commiter
 
 ## Étape 4 : Implémenter authentification
-- [ ] Écrans login/register avec sélection type utilisateur
-- [ ] Ajouter endpoints backend si nécessaire (auth avec JWT)
-- [ ] Commiter
+- [x] Écrans login/register avec sélection type utilisateur
+- [x] Ajouter endpoints backend si nécessaire (auth avec JWT)
+- [x] Commiter
 
 ## Étape 5 : Ajouter sélection type utilisateur et profils
 - [ ] Écran pour choisir type, puis création/édition de profil

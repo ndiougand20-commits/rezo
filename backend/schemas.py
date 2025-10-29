@@ -2,6 +2,11 @@ from pydantic import BaseModel
 from models import UserType
 from typing import Optional
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: 'User'
+
 class UserBase(BaseModel):
     email: str
     user_type: UserType
