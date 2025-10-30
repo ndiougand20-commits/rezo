@@ -30,6 +30,11 @@
 - [ ] Appels API pour récupérer données
 - [ ] Commiter
 
+## Étape 6 : Implémenter écrans de swipe
+- [ ] Swipe pour offres (étudiants) et formations (lycéens)
+- [ ] Appels API pour récupérer données
+- [ ] Commiter
+
 ## Étape 7 : Ajouter écrans de profils
 - [ ] Visualisation/édition de profils utilisateur, entreprise, université
 - [ ] Commiter

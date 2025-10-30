@@ -1,7 +1,7 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session # type: ignore
+from passlib.context import CryptContext # type: ignore
 import models
 import schemas
-from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -21,8 +21,27 @@ def create_user(db: Session, user: schemas.UserCreate):
         last_name=user.last_name,
     )
     db.add(db_user)
-    db.commit()
+    db.commit() # Commit to get the user ID
     db.refresh(db_user)
+
+    # Create the associated profile based on user_type
+    if user.user_type == models.UserType.STUDENT:
+        db_profile = models.Student(user_id=db_user.id)
+    elif user.user_type == models.UserType.HIGH_SCHOOL:
+        db_profile = models.HighSchooler(user_id=db_user.id)
+    elif user.user_type == models.UserType.COMPANY:
+        db_profile = models.Company(user_id=db_user.id)
+    elif user.user_type == models.UserType.UNIVERSITY:
+        db_profile = models.University(user_id=db_user.id)
+    else:
+        # Handle unknown user type if necessary
+        db_profile = None
+
+    if db_profile:
+        db.add(db_profile)
+        db.commit()
+        db.refresh(db_profile)
+
     return db_user
 
 def create_student(db: Session, student: schemas.StudentCreate):

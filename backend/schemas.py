@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict # type: ignore
 from models import UserType
 from typing import Optional
 
@@ -15,13 +15,13 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    password_confirm: str
 
 class User(UserBase):
     id: int
     is_active: bool
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class StudentBase(BaseModel):
     user_id: int
@@ -32,8 +32,7 @@ class StudentCreate(StudentBase):
 class Student(StudentBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class HighSchoolerBase(BaseModel):
     user_id: int
@@ -44,8 +43,7 @@ class HighSchoolerCreate(HighSchoolerBase):
 class HighSchooler(HighSchoolerBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class CompanyBase(BaseModel):
     user_id: int
@@ -57,8 +55,7 @@ class Company(CompanyBase):
     id: int
     offers: list['Offer'] = []
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UniversityBase(BaseModel):
     user_id: int
@@ -70,8 +67,7 @@ class University(UniversityBase):
     id: int
     formations: list['Formation'] = []
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class OfferBase(BaseModel):
     title: str
@@ -84,8 +80,7 @@ class OfferCreate(OfferBase):
 class Offer(OfferBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class FormationBase(BaseModel):
     title: str
@@ -98,8 +93,7 @@ class FormationCreate(FormationBase):
 class Formation(FormationBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
-Company.update_forward_refs()
-University.update_forward_refs()
+Company.model_rebuild()
+University.model_rebuild()
