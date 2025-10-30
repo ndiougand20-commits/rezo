@@ -34,21 +34,24 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rezo'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.message),
+            icon: const Icon(Icons.message, color: Colors.white),
             onPressed: () {
               Navigator.of(context).pushNamed('/chat');
             },
           ),
           IconButton(
-            icon: const Icon(Icons.person),
+            icon: const Icon(Icons.person, color: Colors.white),
             onPressed: () {
               Navigator.of(context).pushNamed('/profile');
             },
           ),
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () {
               authProvider.logout();
               Navigator.of(context).pushReplacementNamed('/login');
@@ -56,22 +59,41 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: swipeProvider.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : swipeProvider.error != null
-              ? Center(child: Text('Erreur: ${swipeProvider.error}'))
-              : swipeProvider.items.isEmpty
-                  ? const Center(child: Text('Aucun élément disponible'))
-                  : CardSwiper(
-                      controller: controller,
-                      cardsCount: swipeProvider.items.length,
-                      onSwipe: _onSwipe,
-                      numberOfCardsDisplayed: swipeProvider.items.length > 1 ? 2 : 1,
-                      backCardOffset: const Offset(40, 40),
-                      padding: const EdgeInsets.all(24.0),
-                      cardBuilder: (context, index, horizontalThresholdPercentage, verticalThresholdPercentage) =>
-                          _buildCard(swipeProvider.items[index]),
-                    ),
+      extendBodyBehindAppBar: true,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF1E88E5),
+              Color(0xFF42A5F5),
+              Color(0xFF90CAF9),
+            ],
+          ),
+        ),
+        child: swipeProvider.isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : swipeProvider.error != null
+                ? Center(child: Text('Erreur: ${swipeProvider.error}'))
+                : swipeProvider.items.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Aucun élément disponible',
+                          style: TextStyle(color: Colors.white, fontSize: 18),
+                        ),
+                      )
+                    : CardSwiper(
+                        controller: controller,
+                        cardsCount: swipeProvider.items.length,
+                        onSwipe: _onSwipe,
+                        numberOfCardsDisplayed: swipeProvider.items.length > 1 ? 2 : 1,
+                        backCardOffset: const Offset(40, 40),
+                        padding: const EdgeInsets.all(24.0),
+                        cardBuilder: (context, index, horizontalThresholdPercentage, verticalThresholdPercentage) =>
+                            _buildCard(swipeProvider.items[index]),
+                      ),
+      ),
     );
   }
 

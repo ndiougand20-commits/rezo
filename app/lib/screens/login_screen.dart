@@ -45,136 +45,111 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.white, Colors.white],
+            colors: [
+              Color(0xFF1E88E5),
+              Color(0xFF42A5F5),
+              Color(0xFF90CAF9),
+            ],
           ),
         ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo
-                Image.asset(
-                  'assets/images/Rezo logo (1).png',
-                  height: 120,
-                  width: 120,
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Card(
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                const SizedBox(height: 20),
-                // Texte de bienvenue
-                const Text(
-                  'Bienvenue sur Rezo',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.black54,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'L\'ouverture à votre avenir',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black38,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                // Titre
-                const Text(
-                  'Connexion',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                const SizedBox(height: 40),
-                // Champ Email
-                TextField(
-                  controller: _emailController,
-                  decoration: InputDecoration(
-                    labelText: 'Email',
-                    labelStyle: const TextStyle(color: Colors.black54),
-                    filled: true,
-                    fillColor: Colors.grey.shade200,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.black, width: 2),
-                    ),
-                  ),
-                  style: const TextStyle(color: Colors.black),
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 20),
-                // Champ Mot de passe
-                TextField(
-                  controller: _passwordController,
-                  decoration: InputDecoration(
-                    labelText: 'Mot de passe',
-                    labelStyle: const TextStyle(color: Colors.black54),
-                    filled: true,
-                    fillColor: Colors.grey.shade200,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.black, width: 2),
-                    ),
-                  ),
-                  style: const TextStyle(color: Colors.black),
-                  obscureText: true,
-                ),
-                const SizedBox(height: 30),
-                // Bouton Connexion
-                _isLoading
-                    ? const CircularProgressIndicator(color: Colors.black)
-                    : ElevatedButton(
-                        onPressed: _login,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 5,
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Logo
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E88E5),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Text(
-                          'Se connecter',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        child: const Icon(
+                          Icons.work,
+                          color: Colors.white,
+                          size: 40,
                         ),
                       ),
-                const SizedBox(height: 20),
-                // Lien vers inscription
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pushNamed('/register');
-                  },
-                  child: const Text(
-                    'Pas de compte ? S\'inscrire',
-                    style: TextStyle(color: Colors.black, fontSize: 16),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Bienvenue sur Rezo',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Connectez-vous à votre compte',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF666666),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      TextField(
+                        controller: _emailController,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.email, color: Color(0xFF1E88E5)),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _passwordController,
+                        decoration: const InputDecoration(
+                          labelText: 'Mot de passe',
+                          prefixIcon: Icon(Icons.lock, color: Color(0xFF1E88E5)),
+                        ),
+                        obscureText: true,
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: _isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : ElevatedButton(
+                                onPressed: _login,
+                                child: const Text(
+                                  'Se connecter',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pushNamed('/register');
+                        },
+                        child: const Text(
+                          'Pas de compte ? S\'inscrire',
+                          style: TextStyle(
+                            color: Color(0xFF1E88E5),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),

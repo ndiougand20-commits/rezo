@@ -35,9 +35,9 @@
 - [x] Commiter
 
 ## Étape 8 : Implémenter messagerie
-- [ ] Écrans de chat
-- [ ] Ajouter modèle Message et endpoints backend si nécessaire
-- [ ] Commiter
+- [x] Écrans de chat
+- [x] Ajouter modèle Message et endpoints backend si nécessaire
+- [x] Commiter
 
 ## Étape 9 : Ajouter notifications et matching
 - [ ] Intégrer notifications push, logique de matching
