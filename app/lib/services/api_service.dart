@@ -38,10 +38,11 @@ class ApiService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'email': user.email,
-        'user_type': user.userType.toString().split('.').last,
+        'user_type': user.userType.toString().split('.').last.replaceAll('School', '_school'),
         'first_name': user.firstName,
         'last_name': user.lastName,
         'password': password,
+        'password_confirm': password,
       }),
     );
     if (response.statusCode == 200) {
