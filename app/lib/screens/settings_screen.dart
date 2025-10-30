@@ -17,6 +17,7 @@ class SettingsScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
+        automaticallyImplyLeading: false,
       ),
       body: ListView(
         children: [

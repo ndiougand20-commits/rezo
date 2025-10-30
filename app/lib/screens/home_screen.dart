@@ -37,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
+        automaticallyImplyLeading: false,
       ),
       body: Container(
         color: Colors.white,

@@ -34,6 +34,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
+        automaticallyImplyLeading: false,
       ),
       body: chatProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
