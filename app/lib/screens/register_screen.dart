@@ -73,7 +73,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await Provider.of<AuthProvider>(context, listen: false).register(
         newUser,
         _passwordController.text,
-        _passwordConfirmController.text, // Ajout du mot de passe de confirmation
       );
 
       if (mounted) {

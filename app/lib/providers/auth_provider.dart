@@ -24,7 +24,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<void> register(User user, String password, String text) async {
+  Future<void> register(User user, String password) async {
     try {
       User createdUser = await _apiService.createUser(user, password);
       _user = createdUser;

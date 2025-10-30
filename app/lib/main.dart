@@ -4,7 +4,7 @@ import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/user_type_selection_screen.dart';
-import 'screens/profile_creation_screen.dart';
+
 
 void main() {
   runApp(const MyApp());
@@ -29,7 +29,6 @@ class MyApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
           '/user_type_selection': (context) => const UserTypeSelectionScreen(),
-          '/profile_creation': (context) => const ProfileCreationScreen(),
           '/home': (context) => const HomeScreen(), // Placeholder for now
         },
       ),
