@@ -8,6 +8,8 @@ import '../models/company.dart';
 import '../models/university.dart';
 import '../models/offer.dart';
 import '../models/formation.dart';
+import '../models/conversation.dart';
+import '../models/message.dart';
 
 class ApiService {
   static const String baseUrl = 'http://10.0.2.2:8000'; // For Android emulator
@@ -238,6 +240,62 @@ class ApiService {
       return University.fromJson(jsonDecode(response.body));
     } else {
       throw Exception('Failed to load university profile');
+    }
+  }
+
+  // Conversations
+  Future<Conversation> createConversation(int participant1Id, int participant2Id) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/conversations/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'participant1_id': participant1Id,
+        'participant2_id': participant2Id,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return Conversation.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to create conversation: ${response.body}');
+    }
+  }
+
+  Future<List<Conversation>> getConversationsForUser(int userId) async {
+    final response = await http.get(Uri.parse('$baseUrl/users/$userId/conversations/'));
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      return data.map((e) => Conversation.fromJson(e)).toList();
+    } else {
+      throw Exception('Failed to load conversations');
+    }
+  }
+
+  // Messages
+  Future<Message> createMessage(String content, int senderId, int conversationId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/messages/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'content': content,
+        'sender_id': senderId,
+        'conversation_id': conversationId,
+        'timestamp': DateTime.now().toIso8601String(),
+      }),
+    );
+    if (response.statusCode == 200) {
+      return Message.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to send message: ${response.body}');
+    }
+  }
+
+  Future<List<Message>> getMessagesForConversation(int conversationId) async {
+    final response = await http.get(Uri.parse('$baseUrl/conversations/$conversationId/messages/'));
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      return data.map((e) => Message.fromJson(e)).toList();
+    } else {
+      throw Exception('Failed to load messages');
     }
   }
 }

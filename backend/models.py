@@ -67,3 +67,24 @@ class Formation(Base):
     university_id = Column(Integer, ForeignKey("universities.id"))
 
     university = relationship("University", back_populates="formations")
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+    id = Column(Integer, primary_key=True, index=True)
+    participant1_id = Column(Integer, ForeignKey("users.id"))
+    participant2_id = Column(Integer, ForeignKey("users.id"))
+
+    participant1 = relationship("User", foreign_keys=[participant1_id])
+    participant2 = relationship("User", foreign_keys=[participant2_id])
+    messages = relationship("Message", back_populates="conversation")
+
+class Message(Base):
+    __tablename__ = "messages"
+    id = Column(Integer, primary_key=True, index=True)
+    content = Column(String)
+    sender_id = Column(Integer, ForeignKey("users.id"))
+    conversation_id = Column(Integer, ForeignKey("conversations.id"))
+    timestamp = Column(String)  # Pour simplifier, on utilise une string pour le timestamp
+
+    sender = relationship("User")
+    conversation = relationship("Conversation", back_populates="messages")

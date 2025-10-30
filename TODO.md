@@ -31,8 +31,8 @@
 - [x] Commiter
 
 ## Étape 7 : Ajouter écrans de profils
-- [ ] Visualisation/édition de profils utilisateur, entreprise, université
-- [ ] Commiter
+- [x] Visualisation/édition de profils utilisateur, entreprise, université
+- [x] Commiter
 
 ## Étape 8 : Implémenter messagerie
 - [ ] Écrans de chat

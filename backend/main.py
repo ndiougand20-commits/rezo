@@ -144,3 +144,29 @@ def create_formation_for_university(
 def read_formations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     formations = crud.get_formations(db, skip=skip, limit=limit)
     return formations
+
+# Conversations and Messages
+@app.post("/conversations/", response_model=schemas.Conversation)
+def create_conversation(conversation: schemas.ConversationCreate, db: Session = Depends(get_db)):
+    return crud.create_conversation(db=db, conversation=conversation)
+
+@app.get("/conversations/{conversation_id}", response_model=schemas.Conversation)
+def read_conversation(conversation_id: int, db: Session = Depends(get_db)):
+    db_conversation = crud.get_conversation(db, conversation_id=conversation_id)
+    if db_conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return db_conversation
+
+@app.get("/users/{user_id}/conversations/", response_model=list[schemas.Conversation])
+def read_conversations_for_user(user_id: int, db: Session = Depends(get_db)):
+    conversations = crud.get_conversations_for_user(db, user_id=user_id)
+    return conversations
+
+@app.post("/messages/", response_model=schemas.Message)
+def create_message(message: schemas.MessageCreate, db: Session = Depends(get_db)):
+    return crud.create_message(db=db, message=message)
+
+@app.get("/conversations/{conversation_id}/messages/", response_model=list[schemas.Message])
+def read_messages_for_conversation(conversation_id: int, db: Session = Depends(get_db)):
+    messages = crud.get_messages_for_conversation(db, conversation_id=conversation_id)
+    return messages

@@ -97,3 +97,32 @@ class Formation(FormationBase):
 
 Company.model_rebuild()
 University.model_rebuild()
+
+class ConversationBase(BaseModel):
+    participant1_id: int
+    participant2_id: int
+
+class ConversationCreate(ConversationBase):
+    pass
+
+class Conversation(ConversationBase):
+    id: int
+    messages: list['Message'] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+class MessageBase(BaseModel):
+    content: str
+    sender_id: int
+    conversation_id: int
+    timestamp: str
+
+class MessageCreate(MessageBase):
+    pass
+
+class Message(MessageBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+Conversation.model_rebuild()
