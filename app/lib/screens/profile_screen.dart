@@ -32,15 +32,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final profileProvider = Provider.of<ProfileProvider>(context);
 
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Mon Profil'),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
         automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit, color: Colors.black54),
+            onPressed: () {
+              // TODO: Navigation vers l'écran d'édition du profil
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Édition du profil bientôt disponible')),
+              );
+            },
+          ),
+        ],
       ),
       body: profileProvider.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Colors.black))
           : profileProvider.error != null
               ? Center(child: Text('Erreur: ${profileProvider.error}'))
               : _buildProfileContent(authProvider.user!, profileProvider.profile),
@@ -97,126 +109,349 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildProfileContent(User user, dynamic profile) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Informations de base
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Informations personnelles',
-                    style: Theme.of(context).textTheme.titleLarge,
+          // Header avec avatar et informations de base
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              children: [
+                // Avatar
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16.0),
-                  _buildInfoRow('Nom', '${user.firstName} ${user.lastName}'),
-                  _buildInfoRow('Email', user.email),
-                  _buildInfoRow('Type', _getUserTypeLabel(user.userType)),
-                  _buildInfoRow('Statut', user.isActive ? 'Actif' : 'Inactif'),
-                ],
-              ),
+                  child: Icon(
+                    _getUserTypeIcon(user.userType),
+                    color: Colors.white,
+                    size: 50,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Nom complet
+                Text(
+                  '${user.firstName} ${user.lastName}',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Type d'utilisateur avec badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _getUserTypeLabel(user.userType),
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Statut
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      user.isActive ? Icons.check_circle : Icons.cancel,
+                      color: user.isActive ? Colors.green : Colors.red,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      user.isActive ? 'Actif' : 'Inactif',
+                      style: TextStyle(
+                        color: user.isActive ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16.0),
 
-          // Informations spécifiques au type d'utilisateur
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Informations professionnelles',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 16.0),
-                  _buildSpecificInfo(user.userType, profile),
-                ],
-              ),
+          const SizedBox(height: 16),
+
+          // Informations détaillées
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Column(
+              children: [
+                // Section Informations personnelles
+                _buildSectionCard(
+                  title: 'Informations personnelles',
+                  icon: Icons.person_outline,
+                  children: [
+                    _buildInfoTile('Email', user.email, Icons.email),
+                    _buildInfoTile('Prénom', user.firstName, Icons.badge),
+                    _buildInfoTile('Nom', user.lastName, Icons.badge),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Section Informations professionnelles
+                _buildSectionCard(
+                  title: 'Informations professionnelles',
+                  icon: Icons.business_center,
+                  children: _buildSpecificInfoTiles(user.userType, profile),
+                ),
+              ],
             ),
           ),
+
+          const SizedBox(height: 80), // Espace pour le FAB
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: Colors.black, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoTile(String label, String value, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: Colors.black54, size: 20),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
-          Expanded(child: Text(value)),
         ],
       ),
     );
   }
 
-  Widget _buildSpecificInfo(UserType userType, dynamic profile) {
+  List<Widget> _buildSpecificInfoTiles(UserType userType, dynamic profile) {
     switch (userType) {
       case UserType.student:
-        return _buildStudentInfo(profile as Student);
+        return _buildStudentInfoTiles(profile as Student);
       case UserType.highSchool:
-        return _buildHighSchoolerInfo(profile as HighSchooler);
+        return _buildHighSchoolerInfoTiles(profile as HighSchooler);
       case UserType.company:
-        return _buildCompanyInfo(profile as Company);
+        return _buildCompanyInfoTiles(profile as Company);
       case UserType.university:
-        return _buildUniversityInfo(profile as University);
+        return _buildUniversityInfoTiles(profile as University);
     }
   }
 
-  Widget _buildStudentInfo(Student student) {
-    return Column(
-      children: [
-        _buildInfoRow('ID Étudiant', student.id.toString()),
-        _buildInfoRow('ID Utilisateur', student.userId.toString()),
-        const Text('Informations supplémentaires à venir...'),
-      ],
-    );
+  List<Widget> _buildStudentInfoTiles(Student student) {
+    return [
+      _buildInfoTile('ID Étudiant', student.id.toString(), Icons.school),
+      _buildInfoTile('ID Utilisateur', student.userId.toString(), Icons.account_circle),
+      _buildInfoTile('Statut', 'Étudiant actif', Icons.check_circle_outline),
+    ];
   }
 
-  Widget _buildHighSchoolerInfo(HighSchooler highSchooler) {
-    return Column(
-      children: [
-        _buildInfoRow('ID Lycéen', highSchooler.id.toString()),
-        _buildInfoRow('ID Utilisateur', highSchooler.userId.toString()),
-        const Text('Informations supplémentaires à venir...'),
-      ],
-    );
+  List<Widget> _buildHighSchoolerInfoTiles(HighSchooler highSchooler) {
+    return [
+      _buildInfoTile('ID Lycéen', highSchooler.id.toString(), Icons.school),
+      _buildInfoTile('ID Utilisateur', highSchooler.userId.toString(), Icons.account_circle),
+      _buildInfoTile('Statut', 'Lycéen actif', Icons.check_circle_outline),
+    ];
   }
 
-  Widget _buildCompanyInfo(Company company) {
-    return Column(
-      children: [
-        _buildInfoRow('ID Entreprise', company.id.toString()),
-        _buildInfoRow('ID Utilisateur', company.userId.toString()),
-        _buildInfoRow('Offres publiées', company.offers?.length.toString() ?? '0'),
-        const Text('Informations supplémentaires à venir...'),
-      ],
-    );
+  List<Widget> _buildCompanyInfoTiles(Company company) {
+    return [
+      _buildInfoTile('ID Entreprise', company.id.toString(), Icons.business),
+      _buildInfoTile('ID Utilisateur', company.userId.toString(), Icons.account_circle),
+      _buildInfoTile('Offres publiées', company.offers.length.toString(), Icons.work),
+      if (company.offers.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Dernières offres',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...company.offers.take(3).map((offer) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.work_outline, size: 16, color: Colors.black54),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        offer.title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+            ],
+          ),
+        ),
+    ];
   }
 
-  Widget _buildUniversityInfo(University university) {
-    return Column(
-      children: [
-        _buildInfoRow('ID Université', university.id.toString()),
-        _buildInfoRow('ID Utilisateur', university.userId.toString()),
-        _buildInfoRow('Formations', university.formations?.length.toString() ?? '0'),
-        const Text('Informations supplémentaires à venir...'),
-      ],
-    );
+  List<Widget> _buildUniversityInfoTiles(University university) {
+    return [
+      _buildInfoTile('ID Université', university.id.toString(), Icons.account_balance),
+      _buildInfoTile('ID Utilisateur', university.userId.toString(), Icons.account_circle),
+      _buildInfoTile('Formations', university.formations.length.toString(), Icons.book),
+      if (university.formations.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Formations disponibles',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...university.formations.take(3).map((formation) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.book_outlined, size: 16, color: Colors.black54),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        formation.title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+            ],
+          ),
+        ),
+    ];
+  }
+
+  IconData _getUserTypeIcon(UserType userType) {
+    switch (userType) {
+      case UserType.student:
+        return Icons.school;
+      case UserType.highSchool:
+        return Icons.school;
+      case UserType.company:
+        return Icons.business;
+      case UserType.university:
+        return Icons.account_balance;
+    }
   }
 
   String _getUserTypeLabel(UserType userType) {
