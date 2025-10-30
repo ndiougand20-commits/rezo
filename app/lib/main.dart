@@ -9,6 +9,7 @@ import 'screens/register_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/chat_list_screen.dart';
+import 'screens/settings_screen.dart';
 
 
 
@@ -110,6 +111,7 @@ class MyApp extends StatelessWidget {
           '/home': (context) => const HomeScreen(),
           '/profile': (context) => const ProfileScreen(),
           '/chat': (context) => const ChatListScreen(),
+          '/settings': (context) => const SettingsScreen(), // Placeholder for now
         },
       ),
     );

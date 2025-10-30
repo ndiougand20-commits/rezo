@@ -76,6 +76,9 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.of(context).pushNamed('/profile');
               break;
             case 3:
+              Navigator.of(context).pushNamed('/settings');
+              break;
+            case 4:
               authProvider.logout();
               Navigator.of(context).pushReplacementNamed('/login');
               break;
@@ -93,6 +96,10 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Profil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Paramètres',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.logout),
