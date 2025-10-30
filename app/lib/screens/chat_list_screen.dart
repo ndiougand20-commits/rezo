@@ -16,11 +16,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   void initState() {
     super.initState();
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    if (authProvider.user != null) {
-      chatProvider.loadConversations(authProvider.user!.id);
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      if (authProvider.user != null) {
+        chatProvider.loadConversations(authProvider.user!.id);
+      }
+    });
   }
 
   @override
