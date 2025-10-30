@@ -4,6 +4,7 @@ import 'providers/auth_provider.dart';
 import 'providers/swipe_provider.dart';
 import 'providers/profile_provider.dart';
 import 'providers/chat_provider.dart';
+import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/home_screen.dart';
@@ -104,8 +105,9 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        initialRoute: '/login',
+        initialRoute: '/splash',
         routes: {
+          '/splash': (context) => const SplashScreen(),
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
           '/home': (context) => const HomeScreen(),

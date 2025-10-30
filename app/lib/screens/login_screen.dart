@@ -165,7 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Navigator.of(context).pushNamed('/register');
                     },
                     child: const Text(
-                      'Pas de compte ? S\'inscrire',
+                      'S\'inscrire',
                       style: TextStyle(color: Colors.black, fontSize: 16),
                     ),
                   ),
