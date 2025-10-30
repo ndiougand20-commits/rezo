@@ -36,6 +36,12 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Rezo'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.of(context).pushNamed('/profile');
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
               authProvider.logout();
