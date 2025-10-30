@@ -19,11 +19,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final swipeProvider = Provider.of<SwipeProvider>(context, listen: false);
-    if (authProvider.user != null) {
-      swipeProvider.loadItems(authProvider.user!.userType);
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final swipeProvider = Provider.of<SwipeProvider>(context, listen: false);
+      if (authProvider.user != null) {
+        swipeProvider.loadItems(authProvider.user!.userType);
+      }
+    });
   }
 
   @override
