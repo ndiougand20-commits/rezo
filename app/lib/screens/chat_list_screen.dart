@@ -74,10 +74,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
             case 3:
               Navigator.of(context).pushNamed('/settings');
               break;
-            case 4:
-              authProvider.logout();
-              Navigator.of(context).pushReplacementNamed('/login');
-              break;
           }
         },
         items: const [
@@ -96,10 +92,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
             label: 'Paramètres',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.logout),
-            label: 'Déconnexion',
           ),
         ],
       ),
