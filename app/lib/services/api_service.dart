@@ -203,4 +203,41 @@ class ApiService {
       throw Exception('Failed to load formations');
     }
   }
+
+  // Get profiles by user ID
+  Future<Student> getStudentByUserId(int userId) async {
+    final response = await http.get(Uri.parse('$baseUrl/students/user/$userId'));
+    if (response.statusCode == 200) {
+      return Student.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load student profile');
+    }
+  }
+
+  Future<HighSchooler> getHighSchoolerByUserId(int userId) async {
+    final response = await http.get(Uri.parse('$baseUrl/high_schoolers/user/$userId'));
+    if (response.statusCode == 200) {
+      return HighSchooler.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load high schooler profile');
+    }
+  }
+
+  Future<Company> getCompanyByUserId(int userId) async {
+    final response = await http.get(Uri.parse('$baseUrl/companies/user/$userId'));
+    if (response.statusCode == 200) {
+      return Company.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load company profile');
+    }
+  }
+
+  Future<University> getUniversityByUserId(int userId) async {
+    final response = await http.get(Uri.parse('$baseUrl/universities/user/$userId'));
+    if (response.statusCode == 200) {
+      return University.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load university profile');
+    }
+  }
 }

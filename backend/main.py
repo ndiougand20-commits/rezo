@@ -89,6 +89,34 @@ def read_user(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     return db_user
 
+@app.get("/students/user/{user_id}", response_model=schemas.Student)
+def read_student_by_user_id(user_id: int, db: Session = Depends(get_db)):
+    db_student = crud.get_student_by_user_id(db, user_id=user_id)
+    if db_student is None:
+        raise HTTPException(status_code=404, detail="Student not found")
+    return db_student
+
+@app.get("/high_schoolers/user/{user_id}", response_model=schemas.HighSchooler)
+def read_high_schooler_by_user_id(user_id: int, db: Session = Depends(get_db)):
+    db_high_schooler = crud.get_high_schooler_by_user_id(db, user_id=user_id)
+    if db_high_schooler is None:
+        raise HTTPException(status_code=404, detail="High schooler not found")
+    return db_high_schooler
+
+@app.get("/companies/user/{user_id}", response_model=schemas.Company)
+def read_company_by_user_id(user_id: int, db: Session = Depends(get_db)):
+    db_company = crud.get_company_by_user_id(db, user_id=user_id)
+    if db_company is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+    return db_company
+
+@app.get("/universities/user/{user_id}", response_model=schemas.University)
+def read_university_by_user_id(user_id: int, db: Session = Depends(get_db)):
+    db_university = crud.get_university_by_user_id(db, user_id=user_id)
+    if db_university is None:
+        raise HTTPException(status_code=404, detail="University not found")
+    return db_university
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}

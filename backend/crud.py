@@ -54,6 +54,9 @@ def create_student(db: Session, student: schemas.StudentCreate):
 def get_student(db: Session, student_id: int):
     return db.query(models.Student).filter(models.Student.id == student_id).first()
 
+def get_student_by_user_id(db: Session, user_id: int):
+    return db.query(models.Student).filter(models.Student.user_id == user_id).first()
+
 def create_high_schooler(db: Session, high_schooler: schemas.HighSchoolerCreate):
     db_high_schooler = models.HighSchooler(**high_schooler.dict())
     db.add(db_high_schooler)
@@ -63,6 +66,9 @@ def create_high_schooler(db: Session, high_schooler: schemas.HighSchoolerCreate)
 
 def get_high_schooler(db: Session, high_schooler_id: int):
     return db.query(models.HighSchooler).filter(models.HighSchooler.id == high_schooler_id).first()
+
+def get_high_schooler_by_user_id(db: Session, user_id: int):
+    return db.query(models.HighSchooler).filter(models.HighSchooler.user_id == user_id).first()
 
 def create_company(db: Session, company: schemas.CompanyCreate):
     db_company = models.Company(**company.dict())
@@ -74,6 +80,9 @@ def create_company(db: Session, company: schemas.CompanyCreate):
 def get_company(db: Session, company_id: int):
     return db.query(models.Company).filter(models.Company.id == company_id).first()
 
+def get_company_by_user_id(db: Session, user_id: int):
+    return db.query(models.Company).filter(models.Company.user_id == user_id).first()
+
 def create_university(db: Session, university: schemas.UniversityCreate):
     db_university = models.University(**university.dict())
     db.add(db_university)
@@ -83,6 +92,9 @@ def create_university(db: Session, university: schemas.UniversityCreate):
 
 def get_university(db: Session, university_id: int):
     return db.query(models.University).filter(models.University.id == university_id).first()
+
+def get_university_by_user_id(db: Session, user_id: int):
+    return db.query(models.University).filter(models.University.user_id == user_id).first()
 
 def create_company_offer(db: Session, offer: schemas.OfferCreate, company_id: int):
     db_offer = models.Offer(**offer.dict(), company_id=company_id)
