@@ -129,7 +129,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'L\'ouverture à votre avenir',
+                  'Votre avenir en un swipe',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.black38,
