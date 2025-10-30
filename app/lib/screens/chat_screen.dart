@@ -32,6 +32,9 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Conversation ${widget.conversation.id}'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
       ),
       body: Column(
         children: [
@@ -51,7 +54,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
                               padding: const EdgeInsets.all(12.0),
                               decoration: BoxDecoration(
-                                color: isMe ? Colors.blue : Colors.grey[300],
+                                color: isMe ? Colors.black : Colors.grey[300],
                                 borderRadius: BorderRadius.circular(16.0),
                               ),
                               child: Text(
@@ -72,14 +75,27 @@ class _ChatScreenState extends State<ChatScreen> {
                 Expanded(
                   child: TextField(
                     controller: _messageController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'Tapez votre message...',
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.black, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
                     ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.send),
+                  icon: const Icon(Icons.send, color: Colors.black),
                   onPressed: () async {
                     if (_messageController.text.isNotEmpty) {
                       await chatProvider.sendMessage(
@@ -93,6 +109,44 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 1,
+        onTap: (index) {
+          switch (index) {
+            case 0:
+              Navigator.of(context).pushReplacementNamed('/home');
+              break;
+            case 1:
+              Navigator.of(context).pop(); // Retour à la liste des chats
+              break;
+            case 2:
+              Navigator.of(context).pushNamed('/profile');
+              break;
+            case 3:
+              authProvider.logout();
+              Navigator.of(context).pushReplacementNamed('/login');
+              break;
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Accueil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'Messages',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.logout),
+            label: 'Déconnexion',
           ),
         ],
       ),

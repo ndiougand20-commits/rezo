@@ -26,10 +26,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   Widget build(BuildContext context) {
     final chatProvider = Provider.of<ChatProvider>(context);
+    final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Messages'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
       ),
       body: chatProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -54,6 +58,44 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         );
                       },
                     ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 1,
+        onTap: (index) {
+          switch (index) {
+            case 0:
+              Navigator.of(context).pushReplacementNamed('/home');
+              break;
+            case 1:
+              // Déjà sur chat
+              break;
+            case 2:
+              Navigator.of(context).pushNamed('/profile');
+              break;
+            case 3:
+              authProvider.logout();
+              Navigator.of(context).pushReplacementNamed('/login');
+              break;
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Accueil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'Messages',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.logout),
+            label: 'Déconnexion',
+          ),
+        ],
+      ),
     );
   }
 }

@@ -34,16 +34,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mon Profil'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              authProvider.logout();
-              profileProvider.clearProfile();
-              Navigator.of(context).pushReplacementNamed('/login');
-            },
-          ),
-        ],
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
       ),
       body: profileProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -57,7 +50,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SnackBar(content: Text('Édition du profil bientôt disponible')),
           );
         },
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
         child: const Icon(Icons.edit),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 2,
+        onTap: (index) {
+          switch (index) {
+            case 0:
+              Navigator.of(context).pushReplacementNamed('/home');
+              break;
+            case 1:
+              Navigator.of(context).pushNamed('/chat');
+              break;
+            case 2:
+              // Déjà sur profile
+              break;
+            case 3:
+              authProvider.logout();
+              profileProvider.clearProfile();
+              Navigator.of(context).pushReplacementNamed('/login');
+              break;
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Accueil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'Messages',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.logout),
+            label: 'Déconnexion',
+          ),
+        ],
       ),
     );
   }
