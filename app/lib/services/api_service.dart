@@ -1,0 +1,206 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../models/user.dart';
+import '../models/token.dart';
+import '../models/student.dart';
+import '../models/high_schooler.dart';
+import '../models/company.dart';
+import '../models/university.dart';
+import '../models/offer.dart';
+import '../models/formation.dart';
+
+class ApiService {
+  static const String baseUrl = 'http://10.0.2.2:8000'; // For Android emulator
+
+  // Auth
+  Future<Token> login(String email, String password) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/token'),
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: {
+        'username': email,
+        'password': password,
+      },
+    );
+    if (response.statusCode == 200) {
+      return Token.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to login: ${response.body}');
+    }
+  }
+
+  // Users
+  Future<User> createUser(User user, String password) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/users/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': user.email,
+        'user_type': user.userType.toString().split('.').last,
+        'first_name': user.firstName,
+        'last_name': user.lastName,
+        'password': password,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return User.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to create user: ${response.body}');
+    }
+  }
+
+  Future<User> getUser(int userId) async {
+    final response = await http.get(Uri.parse('$baseUrl/users/$userId'));
+    if (response.statusCode == 200) {
+      return User.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load user');
+    }
+  }
+
+  // Students
+  Future<Student> createStudent(Student student) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/students/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'user_id': student.userId}),
+    );
+    if (response.statusCode == 200) {
+      return Student.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to create student: ${response.body}');
+    }
+  }
+
+  Future<Student> getStudent(int studentId) async {
+    final response = await http.get(Uri.parse('$baseUrl/students/$studentId'));
+    if (response.statusCode == 200) {
+      return Student.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load student');
+    }
+  }
+
+  // High Schoolers
+  Future<HighSchooler> createHighSchooler(HighSchooler highSchooler) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/high_schoolers/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'user_id': highSchooler.userId}),
+    );
+    if (response.statusCode == 200) {
+      return HighSchooler.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to create high schooler: ${response.body}');
+    }
+  }
+
+  Future<HighSchooler> getHighSchooler(int highSchoolerId) async {
+    final response = await http.get(Uri.parse('$baseUrl/high_schoolers/$highSchoolerId'));
+    if (response.statusCode == 200) {
+      return HighSchooler.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load high schooler');
+    }
+  }
+
+  // Companies
+  Future<Company> createCompany(Company company) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/companies/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'user_id': company.userId}),
+    );
+    if (response.statusCode == 200) {
+      return Company.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to create company: ${response.body}');
+    }
+  }
+
+  Future<Company> getCompany(int companyId) async {
+    final response = await http.get(Uri.parse('$baseUrl/companies/$companyId'));
+    if (response.statusCode == 200) {
+      return Company.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load company');
+    }
+  }
+
+  // Universities
+  Future<University> createUniversity(University university) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/universities/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'user_id': university.userId}),
+    );
+    if (response.statusCode == 200) {
+      return University.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to create university: ${response.body}');
+    }
+  }
+
+  Future<University> getUniversity(int universityId) async {
+    final response = await http.get(Uri.parse('$baseUrl/universities/$universityId'));
+    if (response.statusCode == 200) {
+      return University.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load university');
+    }
+  }
+
+  // Offers
+  Future<Offer> createOffer(int companyId, Offer offer) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/companies/$companyId/offers/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'title': offer.title,
+        'description': offer.description,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return Offer.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to create offer: ${response.body}');
+    }
+  }
+
+  Future<List<Offer>> getOffers({int skip = 0, int limit = 100}) async {
+    final response = await http.get(Uri.parse('$baseUrl/offers/?skip=$skip&limit=$limit'));
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      return data.map((e) => Offer.fromJson(e)).toList();
+    } else {
+      throw Exception('Failed to load offers');
+    }
+  }
+
+  // Formations
+  Future<Formation> createFormation(int universityId, Formation formation) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/universities/$universityId/formations/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'title': formation.title,
+        'description': formation.description,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return Formation.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to create formation: ${response.body}');
+    }
+  }
+
+  Future<List<Formation>> getFormations({int skip = 0, int limit = 100}) async {
+    final response = await http.get(Uri.parse('$baseUrl/formations/?skip=$skip&limit=$limit'));
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      return data.map((e) => Formation.fromJson(e)).toList();
+    } else {
+      throw Exception('Failed to load formations');
+    }
+  }
+}
