@@ -40,7 +40,16 @@
 - [x] Commiter
 
 ## Étape 9 : Ajouter notifications et matching
-- [ ] Intégrer notifications push, logique de matching
+- [ ] Ajouter modèle Match et device_token dans backend/models.py
+- [ ] Ajouter schémas pour Match dans backend/schemas.py
+- [ ] Ajouter CRUD pour Match dans backend/crud.py
+- [ ] Ajouter endpoints pour liking et device token dans backend/main.py
+- [ ] Ajouter firebase-admin à backend/requirements.txt et intégrer FCM
+- [ ] Ajouter firebase_messaging à app/pubspec.yaml
+- [ ] Créer modèle Match dans app/lib/models/match.dart
+- [ ] Mettre à jour ApiService pour liking et device token
+- [ ] Mettre à jour SwipeProvider pour appeler API sur swipe right
+- [ ] Créer NotificationProvider pour gérer notifications
 - [ ] Commiter
 
 ## Étape 10 : Tester et polir

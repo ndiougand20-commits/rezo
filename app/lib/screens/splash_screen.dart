@@ -71,12 +71,11 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo placeholder - you can replace with your actual logo
+                // Logo
                 Container(
                   width: 120,
                   height: 120,
                   decoration: BoxDecoration(
-                    color: Colors.black,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
@@ -86,31 +85,25 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.connect_without_contact,
-                    color: Colors.white,
-                    size: 60,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Image.asset(
+                      'assets/images/Rezo logo.png',
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  'Rezo',
+                  'Votre avenir en un Swipe',
                   style: TextStyle(
-                    fontSize: 32,
+                    fontSize: 25,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                     letterSpacing: 2,
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Connectez-vous avec l\'avenir',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w300,
-                  ),
-                ),
               ],
             ),
           ),
