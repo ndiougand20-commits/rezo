@@ -34,44 +34,12 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rezo'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.message, color: Colors.white),
-            onPressed: () {
-              Navigator.of(context).pushNamed('/chat');
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.person, color: Colors.white),
-            onPressed: () {
-              Navigator.of(context).pushNamed('/profile');
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () {
-              authProvider.logout();
-              Navigator.of(context).pushReplacementNamed('/login');
-            },
-          ),
-        ],
+        foregroundColor: Colors.black,
       ),
-      extendBodyBehindAppBar: true,
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF1E88E5),
-              Color(0xFF42A5F5),
-              Color(0xFF90CAF9),
-            ],
-          ),
-        ),
+        color: Colors.white,
         child: swipeProvider.isLoading
             ? const Center(child: CircularProgressIndicator())
             : swipeProvider.error != null
@@ -80,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ? const Center(
                         child: Text(
                           'Aucun élément disponible',
-                          style: TextStyle(color: Colors.white, fontSize: 18),
+                          style: TextStyle(color: Colors.black, fontSize: 18),
                         ),
                       )
                     : CardSwiper(
@@ -93,6 +61,44 @@ class _HomeScreenState extends State<HomeScreen> {
                         cardBuilder: (context, index, horizontalThresholdPercentage, verticalThresholdPercentage) =>
                             _buildCard(swipeProvider.items[index]),
                       ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 0,
+        onTap: (index) {
+          switch (index) {
+            case 0:
+              // Déjà sur home
+              break;
+            case 1:
+              Navigator.of(context).pushNamed('/chat');
+              break;
+            case 2:
+              Navigator.of(context).pushNamed('/profile');
+              break;
+            case 3:
+              authProvider.logout();
+              Navigator.of(context).pushReplacementNamed('/login');
+              break;
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Accueil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'Messages',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.logout),
+            label: 'Déconnexion',
+          ),
+        ],
       ),
     );
   }

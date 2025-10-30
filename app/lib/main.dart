@@ -31,28 +31,29 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Rezo',
         theme: ThemeData(
-          primaryColor: const Color(0xFF1E88E5), // Bleu moderne
+          primaryColor: Colors.black,
           colorScheme: const ColorScheme.light(
-            primary: Color(0xFF1E88E5),
-            secondary: Color(0xFF26A69A), // Teal pour les accents
+            primary: Colors.black,
+            secondary: Colors.white,
             surface: Colors.white,
-            background: Color(0xFFF5F5F5),
-            error: Color(0xFFE53935),
+            background: Colors.white,
+            error: Colors.red,
           ),
-          scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+          scaffoldBackgroundColor: Colors.white,
           appBarTheme: const AppBarTheme(
-            backgroundColor: Color(0xFF1E88E5),
-            foregroundColor: Colors.white,
-            elevation: 2,
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            elevation: 0,
             centerTitle: true,
             titleTextStyle: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
+              color: Colors.black,
             ),
           ),
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E88E5),
+              backgroundColor: Colors.black,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
@@ -63,37 +64,42 @@ class MyApp extends StatelessWidget {
           ),
           inputDecorationTheme: InputDecorationTheme(
             filled: true,
-            fillColor: Colors.white,
+            fillColor: Colors.grey.shade100,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+              borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+              borderSide: BorderSide.none,
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF1E88E5), width: 2),
+              borderSide: const BorderSide(color: Colors.black, width: 2),
             ),
-            labelStyle: const TextStyle(color: Color(0xFF666666)),
-            hintStyle: const TextStyle(color: Color(0xFF999999)),
+            labelStyle: const TextStyle(color: Colors.black54),
+            hintStyle: const TextStyle(color: Colors.black38),
           ),
-
+          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+            backgroundColor: Colors.white,
+            selectedItemColor: Colors.black,
+            unselectedItemColor: Colors.black54,
+            elevation: 8,
+          ),
           textTheme: const TextTheme(
             headlineSmall: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF333333),
+              color: Colors.black,
             ),
             titleLarge: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF333333),
+              color: Colors.black,
             ),
             bodyLarge: TextStyle(
               fontSize: 16,
-              color: Color(0xFF666666),
+              color: Colors.black87,
             ),
           ),
         ),
