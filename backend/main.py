@@ -170,3 +170,14 @@ def create_message(message: schemas.MessageCreate, db: Session = Depends(get_db)
 def read_messages_for_conversation(conversation_id: int, db: Session = Depends(get_db)):
     messages = crud.get_messages_for_conversation(db, conversation_id=conversation_id)
     return messages
+
+# Matches
+@app.post("/api/matches/", response_model=schemas.Match)
+def create_match_endpoint(match: schemas.MatchCreate, db: Session = Depends(get_db)):
+    # On vérifie qu'on a bien soit une offre, soit une formation, mais pas les deux
+    if not (match.offer_id is None) ^ (match.formation_id is None):
+        raise HTTPException(status_code=400, detail="Either offer_id or formation_id must be provided, but not both.")
+    
+    # On pourrait ajouter une vérification pour s'assurer que l'utilisateur ou l'offre/formation existent
+    
+    return crud.create_match(db=db, match=match)

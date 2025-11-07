@@ -73,13 +73,13 @@ class _HomeScreenState extends State<HomeScreen> {
               // Déjà sur home
               break;
             case 1:
-              Navigator.of(context).pushNamed('/chat');
+              Navigator.of(context).pushReplacementNamed('/profile');
               break;
             case 2:
-              Navigator.of(context).pushNamed('/profile');
+              Navigator.of(context).pushReplacementNamed('/chat');
               break;
             case 3:
-              Navigator.of(context).pushNamed('/settings');
+              Navigator.of(context).pushReplacementNamed('/settings');
               break;
           }
         },
@@ -89,12 +89,12 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Accueil',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.message),
-            label: 'Messages',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Profil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'Messages',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),

@@ -50,10 +50,10 @@ class SettingsScreen extends StatelessWidget {
               Navigator.of(context).pushReplacementNamed('/home');
               break;
             case 1:
-              Navigator.of(context).pushNamed('/chat');
+              Navigator.of(context).pushReplacementNamed('/profile');
               break;
             case 2:
-              Navigator.of(context).pushNamed('/profile');
+              Navigator.of(context).pushReplacementNamed('/chat');
               break;
             case 3:
               // Settings - already here
@@ -66,12 +66,12 @@ class SettingsScreen extends StatelessWidget {
             label: 'Accueil',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.message),
-            label: 'Messages',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Profil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'Messages',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),

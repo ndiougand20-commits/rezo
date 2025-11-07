@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict # type: ignore
 from models import UserType
+from datetime import datetime
 from typing import Optional
 
 class Token(BaseModel):
@@ -126,3 +127,19 @@ class Message(MessageBase):
     model_config = ConfigDict(from_attributes=True)
 
 Conversation.model_rebuild()
+
+# Schéma pour la création d'un match (ce que l'API reçoit)
+class MatchCreate(BaseModel):
+    user_id: int
+    offer_id: Optional[int] = None
+    formation_id: Optional[int] = None
+
+# Schéma pour lire un match (ce que l'API renvoie)
+class Match(BaseModel):
+    id: int
+    user_id: int
+    offer_id: Optional[int] = None
+    formation_id: Optional[int] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

@@ -19,11 +19,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
-    if (authProvider.user != null) {
-      profileProvider.loadProfile(authProvider.user!);
-    }
+    // On utilise addPostFrameCallback pour s'assurer que le contexte est pleinement
+    // disponible et que l'on ne modifie pas l'état pendant la construction.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+      if (authProvider.user != null) {
+        profileProvider.loadProfile(authProvider.user!);
+      }
+    });
   }
 
   @override
@@ -68,20 +72,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: const Icon(Icons.edit),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 2,
+        currentIndex: 1,
         onTap: (index) {
           switch (index) {
             case 0:
               Navigator.of(context).pushReplacementNamed('/home');
               break;
             case 1:
-              Navigator.of(context).pushNamed('/chat');
+              // Déjà sur profil
               break;
             case 2:
-              // Déjà sur profile
+              Navigator.of(context).pushReplacementNamed('/chat');
               break;
             case 3:
-              Navigator.of(context).pushNamed('/settings');
+              Navigator.of(context).pushReplacementNamed('/settings');
               break;
           }
         },
@@ -91,12 +95,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             label: 'Accueil',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.message),
-            label: 'Messages',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Profil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'Messages',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),

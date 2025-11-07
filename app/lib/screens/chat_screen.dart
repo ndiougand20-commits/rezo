@@ -120,13 +120,13 @@ class _ChatScreenState extends State<ChatScreen> {
               Navigator.of(context).pushReplacementNamed('/home');
               break;
             case 1:
-              Navigator.of(context).pop(); // Retour à la liste des chats
+              Navigator.of(context).pushReplacementNamed('/chat');
               break;
             case 2:
-              Navigator.of(context).pushNamed('/profile');
+              Navigator.of(context).pushReplacementNamed('/profile');
               break;
             case 3:
-              Navigator.of(context).pushNamed('/settings');
+              Navigator.of(context).pushReplacementNamed('/settings');
               break;
           }
         },

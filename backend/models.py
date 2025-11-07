@@ -1,5 +1,6 @@
-from sqlalchemy import Boolean, Column, Integer, String, Enum, ForeignKey
+from sqlalchemy import Boolean, Column, Integer, String, Enum, ForeignKey, DateTime
 from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.sql import func
 from database import Base
 import enum
 
@@ -88,3 +89,21 @@ class Message(Base):
 
     sender = relationship("User")
     conversation = relationship("Conversation", back_populates="messages")
+
+class Match(Base):
+    __tablename__ = "matches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Qui a fait l'action de swiper
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    # Sur quoi l'action a été faite (une seule des deux sera remplie)
+    offer_id = Column(Integer, ForeignKey("offers.id"), nullable=True)
+    formation_id = Column(Integer, ForeignKey("formations.id"), nullable=True)
+
+    # Relation pour accéder à l'utilisateur depuis un match
+    user = relationship("User")
+    offer = relationship("Offer")
+    formation = relationship("Formation")

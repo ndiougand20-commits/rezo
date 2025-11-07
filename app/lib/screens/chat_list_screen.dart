@@ -52,30 +52,26 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           title: Text('Conversation ${conversation.id}'),
                           subtitle: Text('${conversation.messages.length} messages'),
                           onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => ChatScreen(conversation: conversation),
-                              ),
-                            );
+                            Navigator.of(context).pushNamed('/chat_screen', arguments: conversation);
                           },
                         );
                       },
                     ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 1,
+        currentIndex: 2,
         onTap: (index) {
           switch (index) {
             case 0:
               Navigator.of(context).pushReplacementNamed('/home');
               break;
             case 1:
-              // Déjà sur chat
+              Navigator.of(context).pushReplacementNamed('/profile');
               break;
             case 2:
-              Navigator.of(context).pushNamed('/profile');
+              // Déjà sur chat
               break;
             case 3:
-              Navigator.of(context).pushNamed('/settings');
+              Navigator.of(context).pushReplacementNamed('/settings');
               break;
           }
         },
@@ -85,12 +81,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
             label: 'Accueil',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.message),
-            label: 'Messages',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Profil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'Messages',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),

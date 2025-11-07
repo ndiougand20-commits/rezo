@@ -140,3 +140,20 @@ def create_message(db: Session, message: schemas.MessageCreate):
 
 def get_messages_for_conversation(db: Session, conversation_id: int):
     return db.query(models.Message).filter(models.Message.conversation_id == conversation_id).order_by(models.Message.timestamp).all()
+
+def create_match(db: Session, match: schemas.MatchCreate):
+    """
+    Enregistre un "like" d'un utilisateur sur une offre ou une formation.
+    """
+    db_match = models.Match(
+        user_id=match.user_id,
+        offer_id=match.offer_id,
+        formation_id=match.formation_id
+    )
+    db.add(db_match)
+    db.commit()
+    db.refresh(db_match)
+    # TODO: Ajouter la logique pour vérifier si c'est un "match" mutuel.
+    # Si l'entreprise a "liké" l'étudiant ou si c'est une candidature directe,
+    # on pourrait créer une conversation ici et envoyer une notification.
+    return db_match
