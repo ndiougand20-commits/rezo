@@ -62,6 +62,28 @@ class ApiService {
     }
   }
 
+  Future<User> updateUser({
+    required String token,
+    String? firstName,
+    String? lastName,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/users/me'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'first_name': firstName,
+        'last_name': lastName,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return User.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to update user: ${response.body}');
+    }
+  }
   // Students
   Future<Student> createStudent(Student student) async {
     final response = await http.post(

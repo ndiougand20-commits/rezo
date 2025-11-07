@@ -10,6 +10,7 @@ import 'screens/home_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/chat_list_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/edit_profile_screen.dart';
 import 'screens/chat_screen.dart';
 import 'models/conversation.dart';
 
@@ -109,6 +110,7 @@ class MainApp extends StatelessWidget {
           '/profile': (context) => const ProfileScreen(),
           '/chat': (context) => const ChatListScreen(),
           '/settings': (context) => const SettingsScreen(),
+          '/edit-profile': (context) => const EditProfileScreen(),
         },
         onGenerateRoute: (settings) {
           if (settings.name == '/chat_screen') {

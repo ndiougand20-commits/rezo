@@ -46,12 +46,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit, color: Colors.black54),
-            onPressed: () {
-              // TODO: Navigation vers l'écran d'édition du profil
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Édition du profil bientôt disponible')),
-              );
-            },
+            onPressed: () => Navigator.of(context).pushNamed('/edit-profile'),
           ),
         ],
       ),
@@ -63,12 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? _buildProfileContent(authProvider.user!, profileProvider.profile)
                   : const Center(child: Text('Profil non trouvé.')), // Cas où le profil est null sans erreur
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Navigation vers l'écran d'édition du profil
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Édition du profil bientôt disponible')),
-          );
-        },
+        onPressed: () => Navigator.of(context).pushNamed('/edit-profile'),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         child: const Icon(Icons.edit),
