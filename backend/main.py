@@ -172,7 +172,7 @@ def read_messages_for_conversation(conversation_id: int, db: Session = Depends(g
     return messages
 
 # Matches
-@app.post("/api/matches/", response_model=schemas.Match)
+@app.post("/api/matches/", response_model=schemas.MatchResponse)
 def create_match_endpoint(match: schemas.MatchCreate, db: Session = Depends(get_db)):
     # On vérifie qu'on a bien soit une offre, soit une formation, mais pas les deux
     if not (match.offer_id is None) ^ (match.formation_id is None):
@@ -180,4 +180,4 @@ def create_match_endpoint(match: schemas.MatchCreate, db: Session = Depends(get_
     
     # On pourrait ajouter une vérification pour s'assurer que l'utilisateur ou l'offre/formation existent
     
-    return crud.create_match(db=db, match=match)
+    return crud.create_match(db=db, match_data=match)

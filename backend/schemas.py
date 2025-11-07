@@ -143,3 +143,8 @@ class Match(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+class MatchResponse(BaseModel):
+    match: Match
+    is_new_conversation: bool
+    conversation_id: Optional[int] = None

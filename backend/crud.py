@@ -131,6 +131,13 @@ def get_conversations_for_user(db: Session, user_id: int):
         (models.Conversation.participant1_id == user_id) | (models.Conversation.participant2_id == user_id)
     ).all()
 
+def get_conversation_between_users(db: Session, user1_id: int, user2_id: int):
+    return db.query(models.Conversation).filter(
+        ((models.Conversation.participant1_id == user1_id) & (models.Conversation.participant2_id == user2_id)) |
+        ((models.Conversation.participant1_id == user2_id) & (models.Conversation.participant2_id == user1_id))
+    ).first()
+
+
 def create_message(db: Session, message: schemas.MessageCreate):
     db_message = models.Message(**message.dict())
     db.add(db_message)
@@ -141,19 +148,46 @@ def create_message(db: Session, message: schemas.MessageCreate):
 def get_messages_for_conversation(db: Session, conversation_id: int):
     return db.query(models.Message).filter(models.Message.conversation_id == conversation_id).order_by(models.Message.timestamp).all()
 
-def create_match(db: Session, match: schemas.MatchCreate):
+def create_match(db: Session, match_data: schemas.MatchCreate):
     """
     Enregistre un "like" d'un utilisateur sur une offre ou une formation.
+    Si c'est une candidature (étudiant -> offre) ou un intérêt (lycéen -> formation),
+    crée une conversation si elle n'existe pas déjà.
     """
     db_match = models.Match(
-        user_id=match.user_id,
-        offer_id=match.offer_id,
-        formation_id=match.formation_id
+        user_id=match_data.user_id,
+        offer_id=match_data.offer_id,
+        formation_id=match_data.formation_id
     )
     db.add(db_match)
     db.commit()
     db.refresh(db_match)
-    # TODO: Ajouter la logique pour vérifier si c'est un "match" mutuel.
-    # Si l'entreprise a "liké" l'étudiant ou si c'est une candidature directe,
-    # on pourrait créer une conversation ici et envoyer une notification.
-    return db_match
+
+    participant1_id = match_data.user_id
+    participant2_id = None
+
+    # Cas d'une candidature à une offre
+    if match_data.offer_id:
+        offer = db.query(models.Offer).filter(models.Offer.id == match_data.offer_id).first()
+        if offer and offer.company:
+            participant2_id = offer.company.user_id
+
+    # Cas d'un intérêt pour une formation
+    elif match_data.formation_id:
+        formation = db.query(models.Formation).filter(models.Formation.id == match_data.formation_id).first()
+        if formation and formation.university:
+            participant2_id = formation.university.user_id
+
+    if participant1_id and participant2_id:
+        # Vérifier si une conversation existe déjà
+        existing_conversation = get_conversation_between_users(db, participant1_id, participant2_id)
+        if existing_conversation:
+            return {"match": db_match, "is_new_conversation": False, "conversation_id": existing_conversation.id}
+        else:
+            # Créer une nouvelle conversation
+            new_conversation_data = schemas.ConversationCreate(participant1_id=participant1_id, participant2_id=participant2_id)
+            new_conversation = create_conversation(db, new_conversation_data)
+            # TODO: Envoyer une notification push ici
+            return {"match": db_match, "is_new_conversation": True, "conversation_id": new_conversation.id}
+
+    return {"match": db_match, "is_new_conversation": False, "conversation_id": None}

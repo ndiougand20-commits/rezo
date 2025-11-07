@@ -58,8 +58,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: profileProvider.isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.black))
           : profileProvider.error != null
-              ? Center(child: Text('Erreur: ${profileProvider.error}'))
-              : _buildProfileContent(authProvider.user!, profileProvider.profile),
+              ? Center(child: Text('Erreur: ${profileProvider.error}')) // Affiche l'erreur s'il y en a une
+              : profileProvider.profile != null // Vérifie que le profil n'est pas null
+                  ? _buildProfileContent(authProvider.user!, profileProvider.profile)
+                  : const Center(child: Text('Profil non trouvé.')), // Cas où le profil est null sans erreur
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           // TODO: Navigation vers l'écran d'édition du profil
