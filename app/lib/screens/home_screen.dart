@@ -185,11 +185,16 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _onSwipe(int previousIndex, int? currentIndex, CardSwiperDirection direction) {
     final swipeProvider = Provider.of<SwipeProvider>(context, listen: false);
     final item = swipeProvider.items[previousIndex];
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.user;
+    final token = authProvider.token;
 
-    if (direction == CardSwiperDirection.right) {
-      swipeProvider.onSwipeRight(item);
+    if (direction == CardSwiperDirection.right && user != null && token != null) {
+      swipeProvider.onSwipeRight(item, user.id, token);
     } else if (direction == CardSwiperDirection.left) {
       swipeProvider.onSwipeLeft(item);
+    } else if (user == null || token == null) {
+      print("Erreur: Utilisateur non authentifié, impossible de swiper.");
     }
 
     return true;

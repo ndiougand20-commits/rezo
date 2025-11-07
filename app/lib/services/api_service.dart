@@ -299,4 +299,27 @@ class ApiService {
       throw Exception('Failed to load messages');
     }
   }
+
+  Future<void> createMatch({
+    required int userId,
+    int? offerId,
+    int? formationId,
+    required String token,
+  }) async {
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+    final body = json.encode({
+      'user_id': userId,
+      'offer_id': offerId,
+      'formation_id': formationId,
+    });
+
+    final response = await http.post(Uri.parse('$baseUrl/api/matches/'), headers: headers, body: body);
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to create match: ${response.body}');
+    }
+  }
 }

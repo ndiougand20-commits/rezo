@@ -39,12 +39,26 @@ class SwipeProvider with ChangeNotifier {
     }
   }
 
-  void onSwipeRight(dynamic item) {
-    // Pour l'instant, juste un print. Plus tard, appeler l'API pour postuler ou montrer intérêt
-    if (item is Offer) {
-      print('Postulé à l\'offre: ${item.title}');
-    } else if (item is Formation) {
-      print('Intérêt pour la formation: ${item.title}');
+  Future<void> onSwipeRight(dynamic item, int userId, String token) async {
+    try {
+      if (item is Offer) {
+        await _apiService.createMatch(
+          userId: userId,
+          offerId: item.id,
+          token: token,
+        );
+        print('Postulé à l\'offre: ${item.title}');
+      } else if (item is Formation) {
+        await _apiService.createMatch(
+          userId: userId,
+          formationId: item.id,
+          token: token,
+        );
+        print('Intérêt pour la formation: ${item.title}');
+      }
+    } catch (e) {
+      _error = 'Erreur lors du match: $e';
+      notifyListeners();
     }
   }
 
