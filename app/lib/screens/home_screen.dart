@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../providers/swipe_provider.dart';
 import '../models/offer.dart';
 import '../models/formation.dart';
+import '../models/match_response.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -182,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  bool _onSwipe(int previousIndex, int? currentIndex, CardSwiperDirection direction) {
+  Future<bool> _onSwipe(int previousIndex, int? currentIndex, CardSwiperDirection direction) async {
     final swipeProvider = Provider.of<SwipeProvider>(context, listen: false);
     final item = swipeProvider.items[previousIndex];
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -190,7 +191,33 @@ class _HomeScreenState extends State<HomeScreen> {
     final token = authProvider.token;
 
     if (direction == CardSwiperDirection.right && user != null && token != null) {
-      swipeProvider.onSwipeRight(item, user.id, token);
+      final MatchResponse? response = await swipeProvider.onSwipeRight(item, user.id, token);
+      if (response != null && response.isNewConversation && mounted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text("C'est un match !"),
+              content: const Text("Une nouvelle conversation a été créée. Vous pouvez maintenant discuter."),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text("Voir mes messages"),
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Ferme la dialog
+                    Navigator.of(context).pushReplacementNamed('/chat'); // Navigue vers le chat
+                  },
+                ),
+                TextButton(
+                  child: const Text("Continuer"),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      }
     } else if (direction == CardSwiperDirection.left) {
       swipeProvider.onSwipeLeft(item);
     } else if (user == null || token == null) {

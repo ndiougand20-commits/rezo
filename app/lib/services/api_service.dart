@@ -10,6 +10,7 @@ import '../models/offer.dart';
 import '../models/formation.dart';
 import '../models/conversation.dart';
 import '../models/message.dart';
+import '../models/match_response.dart';
 
 class ApiService {
   static const String baseUrl = 'http://10.0.2.2:8000'; // For Android emulator
@@ -300,7 +301,7 @@ class ApiService {
     }
   }
 
-  Future<void> createMatch({
+  Future<MatchResponse> createMatch({
     required int userId,
     int? offerId,
     int? formationId,
@@ -320,6 +321,8 @@ class ApiService {
 
     if (response.statusCode != 200) {
       throw Exception('Failed to create match: ${response.body}');
+    } else {
+      return MatchResponse.fromJson(json.decode(response.body));
     }
   }
 }

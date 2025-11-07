@@ -3,6 +3,7 @@ import '../models/offer.dart';
 import '../models/formation.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../models/match_response.dart';
 
 class SwipeProvider with ChangeNotifier {
   List<dynamic> _items = [];
@@ -39,27 +40,30 @@ class SwipeProvider with ChangeNotifier {
     }
   }
 
-  Future<void> onSwipeRight(dynamic item, int userId, String token) async {
+  Future<MatchResponse?> onSwipeRight(dynamic item, int userId, String token) async {
     try {
       if (item is Offer) {
-        await _apiService.createMatch(
+        final response = await _apiService.createMatch(
           userId: userId,
           offerId: item.id,
           token: token,
         );
         print('Postulé à l\'offre: ${item.title}');
+        return response;
       } else if (item is Formation) {
-        await _apiService.createMatch(
+        final response = await _apiService.createMatch(
           userId: userId,
           formationId: item.id,
           token: token,
         );
         print('Intérêt pour la formation: ${item.title}');
+        return response;
       }
     } catch (e) {
       _error = 'Erreur lors du match: $e';
       notifyListeners();
     }
+    return null;
   }
 
   void onSwipeLeft(dynamic item) {
