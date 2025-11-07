@@ -82,6 +82,16 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Passwords do not match")
     return crud.create_user(db=db, user=user)
 
+@app.post("/users/me/device-token")
+def update_device_token(token_data: schemas.DeviceTokenUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    crud.update_user_device_token(db, user_id=current_user.id, token=token_data.device_token)
+    return {"message": "Device token updated successfully"}
+
+@app.patch("/users/me", response_model=schemas.User)
+def update_current_user(user_update: schemas.UserUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    updated_user = crud.update_user(db, user_id=current_user.id, user_update=user_update)
+    return updated_user
+
 @app.get("/users/{user_id}", response_model=schemas.User)
 def read_user(user_id: int, db: Session = Depends(get_db)):
     db_user = crud.get_user(db, user_id=user_id)

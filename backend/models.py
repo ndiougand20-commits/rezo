@@ -20,6 +20,7 @@ class User(Base):
     user_type = Column(Enum(UserType))
     first_name = Column(String)
     last_name = Column(String)
+    device_token = Column(String, nullable=True)
 
 class Student(Base):
     __tablename__ = "students"

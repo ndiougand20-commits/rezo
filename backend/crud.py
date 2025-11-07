@@ -44,6 +44,25 @@ def create_user(db: Session, user: schemas.UserCreate):
 
     return db_user
 
+def update_user(db: Session, user_id: int, user_update: schemas.UserUpdate):
+    db_user = get_user(db, user_id)
+    if not db_user:
+        return None
+    update_data = user_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_user, key, value)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+def update_user_device_token(db: Session, user_id: int, token: str):
+    db_user = get_user(db, user_id)
+    if db_user:
+        db_user.device_token = token
+        db.commit()
+        db.refresh(db_user)
+    return db_user
+
 def create_student(db: Session, student: schemas.StudentCreate):
     db_student = models.Student(**student.dict())
     db.add(db_student)

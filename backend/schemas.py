@@ -18,6 +18,10 @@ class UserCreate(UserBase):
     password: str
     password_confirm: str
 
+class UserUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+
 class User(UserBase):
     id: int
     is_active: bool
@@ -148,3 +152,6 @@ class MatchResponse(BaseModel):
     match: Match
     is_new_conversation: bool
     conversation_id: Optional[int] = None
+
+class DeviceTokenUpdate(BaseModel):
+    device_token: str
