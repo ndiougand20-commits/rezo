@@ -48,11 +48,29 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       itemCount: chatProvider.conversations.length,
                       itemBuilder: (context, index) {
                         final conversation = chatProvider.conversations[index];
+                        final otherParticipant = conversation.otherParticipant;
+                        final lastMessage = conversation.lastMessage;
+
                         return ListTile(
-                          title: Text('Conversation ${conversation.id}'),
-                          subtitle: Text('${conversation.messages.length} messages'),
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.black,
+                            child: Text(
+                              '${otherParticipant.firstName[0]}${otherParticipant.lastName[0]}',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                          title: Text(
+                              '${otherParticipant.firstName} ${otherParticipant.lastName}',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(
+                            lastMessage?.content ?? 'Aucun message',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           onTap: () {
-                            Navigator.of(context).pushNamed('/chat_screen', arguments: conversation);
+                            Navigator.of(context).pushNamed('/chat_screen',
+                                arguments: conversation);
                           },
                         );
                       },

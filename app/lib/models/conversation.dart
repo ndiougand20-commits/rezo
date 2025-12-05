@@ -1,35 +1,35 @@
 import 'message.dart';
+import 'user.dart';
 
 class Conversation {
   final int id;
-  final int participant1Id;
-  final int participant2Id;
-  final List<Message> messages;
+  final User otherParticipant;
+  final Message? lastMessage;
 
   Conversation({
     required this.id,
-    required this.participant1Id,
-    required this.participant2Id,
-    this.messages = const [],
+    required this.otherParticipant,
+    this.lastMessage,
   });
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
     return Conversation(
       id: json['id'],
-      participant1Id: json['participant1_id'],
-      participant2Id: json['participant2_id'],
-      messages: (json['messages'] as List<dynamic>?)
-          ?.map((e) => Message.fromJson(e))
-          .toList() ?? [],
+      otherParticipant: User.fromJson(json['other_participant']),
+      lastMessage: json['last_message'] != null
+          ? Message.fromJson(json['last_message'])
+          : null,
     );
   }
 
+  // Les participants ID sont toujours utiles pour la création
+  // mais pas pour l'affichage de la liste.
+  // On garde toJson pour la compatibilité si besoin.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'participant1_id': participant1Id,
-      'participant2_id': participant2Id,
-      'messages': messages.map((e) => e.toJson()).toList(),
+      // Cette méthode n'est plus vraiment utilisée pour l'affichage,
+      // mais on la garde pour la structure.
     };
   }
 }

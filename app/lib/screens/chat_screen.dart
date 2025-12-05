@@ -31,7 +31,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Conversation ${widget.conversation.id}'),
+        title: Text(
+            '${widget.conversation.otherParticipant.firstName} ${widget.conversation.otherParticipant.lastName}'),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
@@ -47,11 +48,15 @@ class _ChatScreenState extends State<ChatScreen> {
                         itemCount: chatProvider.messages.length,
                         itemBuilder: (context, index) {
                           final message = chatProvider.messages[index];
-                          final isMe = message.senderId == authProvider.user!.id;
+                          final isMe =
+                              message.senderId == authProvider.user!.id;
                           return Align(
-                            alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                            alignment: isMe
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
                             child: Container(
-                              margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+                              margin: const EdgeInsets.symmetric(
+                                  vertical: 4.0, horizontal: 8.0),
                               padding: const EdgeInsets.all(12.0),
                               decoration: BoxDecoration(
                                 color: isMe ? Colors.black : Colors.grey[300],
@@ -87,7 +92,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.black, width: 2),
+                        borderSide:
+                            const BorderSide(color: Colors.black, width: 2),
                       ),
                       filled: true,
                       fillColor: Colors.grey.shade100,
@@ -109,43 +115,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 1,
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              Navigator.of(context).pushReplacementNamed('/home');
-              break;
-            case 1:
-              Navigator.of(context).pushReplacementNamed('/chat');
-              break;
-            case 2:
-              Navigator.of(context).pushReplacementNamed('/profile');
-              break;
-            case 3:
-              Navigator.of(context).pushReplacementNamed('/settings');
-              break;
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Accueil',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.message),
-            label: 'Messages',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profil',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Paramètres',
           ),
         ],
       ),
