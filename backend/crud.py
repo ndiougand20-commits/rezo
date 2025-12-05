@@ -76,6 +76,17 @@ def get_student(db: Session, student_id: int):
 def get_student_by_user_id(db: Session, user_id: int):
     return db.query(models.Student).filter(models.Student.user_id == user_id).first()
 
+def update_student_profile(db: Session, user_id: int, profile_data: schemas.StudentUpdate):
+    db_profile = get_student_by_user_id(db, user_id)
+    if not db_profile:
+        return None
+    update_data = profile_data.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_profile, key, value)
+    db.commit()
+    db.refresh(db_profile)
+    return db_profile
+
 def create_high_schooler(db: Session, high_schooler: schemas.HighSchoolerCreate):
     db_high_schooler = models.HighSchooler(**high_schooler.dict())
     db.add(db_high_schooler)
@@ -88,6 +99,17 @@ def get_high_schooler(db: Session, high_schooler_id: int):
 
 def get_high_schooler_by_user_id(db: Session, user_id: int):
     return db.query(models.HighSchooler).filter(models.HighSchooler.user_id == user_id).first()
+
+def update_high_schooler_profile(db: Session, user_id: int, profile_data: schemas.HighSchoolerUpdate):
+    db_profile = get_high_schooler_by_user_id(db, user_id)
+    if not db_profile:
+        return None
+    update_data = profile_data.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_profile, key, value)
+    db.commit()
+    db.refresh(db_profile)
+    return db_profile
 
 def create_company(db: Session, company: schemas.CompanyCreate):
     db_company = models.Company(**company.dict())
@@ -102,6 +124,17 @@ def get_company(db: Session, company_id: int):
 def get_company_by_user_id(db: Session, user_id: int):
     return db.query(models.Company).filter(models.Company.user_id == user_id).first()
 
+def update_company_profile(db: Session, user_id: int, profile_data: schemas.CompanyUpdate):
+    db_profile = get_company_by_user_id(db, user_id)
+    if not db_profile:
+        return None
+    update_data = profile_data.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_profile, key, value)
+    db.commit()
+    db.refresh(db_profile)
+    return db_profile
+
 def create_university(db: Session, university: schemas.UniversityCreate):
     db_university = models.University(**university.dict())
     db.add(db_university)
@@ -114,6 +147,17 @@ def get_university(db: Session, university_id: int):
 
 def get_university_by_user_id(db: Session, user_id: int):
     return db.query(models.University).filter(models.University.user_id == user_id).first()
+
+def update_university_profile(db: Session, user_id: int, profile_data: schemas.UniversityUpdate):
+    db_profile = get_university_by_user_id(db, user_id)
+    if not db_profile:
+        return None
+    update_data = profile_data.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_profile, key, value)
+    db.commit()
+    db.refresh(db_profile)
+    return db_profile
 
 def create_company_offer(db: Session, offer: schemas.OfferCreate, company_id: int):
     db_offer = models.Offer(**offer.dict(), company_id=company_id)
@@ -146,9 +190,25 @@ def get_conversation(db: Session, conversation_id: int):
     return db.query(models.Conversation).filter(models.Conversation.id == conversation_id).first()
 
 def get_conversations_for_user(db: Session, user_id: int):
-    return db.query(models.Conversation).filter(
+    # Récupère toutes les conversations de l'utilisateur
+    conversations = db.query(models.Conversation).filter(
         (models.Conversation.participant1_id == user_id) | (models.Conversation.participant2_id == user_id)
     ).all()
+
+    detailed_conversations = []
+    for conv in conversations:
+        # Détermine qui est l'autre participant
+        other_participant_user = conv.participant2 if conv.participant1_id == user_id else conv.participant1
+        
+        # Récupère le dernier message de la conversation
+        last_message = db.query(models.Message).filter(models.Message.conversation_id == conv.id).order_by(models.Message.timestamp.desc()).first()
+
+        detailed_conversations.append(schemas.ConversationDetail(
+            id=conv.id,
+            other_participant=other_participant_user,
+            last_message=last_message
+        ))
+    return detailed_conversations
 
 def get_conversation_between_users(db: Session, user1_id: int, user2_id: int):
     return db.query(models.Conversation).filter(

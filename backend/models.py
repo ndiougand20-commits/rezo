@@ -26,6 +26,8 @@ class Student(Base):
     __tablename__ = "students"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
+    skills = Column(String, nullable=True) # Ex: "Python, Flutter, SQL"
+    level = Column(String, nullable=True) # Ex: "Master 2"
 
     user = relationship("User")
 
@@ -33,6 +35,8 @@ class HighSchooler(Base):
     __tablename__ = "high_schoolers"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
+    current_school = Column(String, nullable=True)
+    strong_subjects = Column(String, nullable=True) # Ex: "Maths, Physique"
 
     user = relationship("User")
 
@@ -40,6 +44,8 @@ class Company(Base):
     __tablename__ = "companies"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
+    industry = Column(String, nullable=True) # Ex: "Tech, Finance"
+    website = Column(String, nullable=True)
 
     user = relationship("User")
     offers = relationship("Offer", back_populates="company")
@@ -48,6 +54,8 @@ class University(Base):
     __tablename__ = "universities"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
+    accreditations = Column(String, nullable=True)
+    website = Column(String, nullable=True)
 
     user = relationship("User")
     formations = relationship("Formation", back_populates="university")

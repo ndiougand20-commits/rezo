@@ -92,6 +92,42 @@ def update_current_user(user_update: schemas.UserUpdate, current_user: models.Us
     updated_user = crud.update_user(db, user_id=current_user.id, user_update=user_update)
     return updated_user
 
+@app.patch("/students/me", response_model=schemas.Student)
+def update_current_student_profile(profile_data: schemas.StudentUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.user_type != models.UserType.STUDENT:
+        raise HTTPException(status_code=403, detail="User is not a student")
+    updated_profile = crud.update_student_profile(db, user_id=current_user.id, profile_data=profile_data)
+    if not updated_profile:
+        raise HTTPException(status_code=404, detail="Student profile not found")
+    return updated_profile
+
+@app.patch("/high-schoolers/me", response_model=schemas.HighSchooler)
+def update_current_high_schooler_profile(profile_data: schemas.HighSchoolerUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.user_type != models.UserType.HIGH_SCHOOL:
+        raise HTTPException(status_code=403, detail="User is not a high schooler")
+    updated_profile = crud.update_high_schooler_profile(db, user_id=current_user.id, profile_data=profile_data)
+    if not updated_profile:
+        raise HTTPException(status_code=404, detail="High schooler profile not found")
+    return updated_profile
+
+@app.patch("/companies/me", response_model=schemas.Company)
+def update_current_company_profile(profile_data: schemas.CompanyUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.user_type != models.UserType.COMPANY:
+        raise HTTPException(status_code=403, detail="User is not a company")
+    updated_profile = crud.update_company_profile(db, user_id=current_user.id, profile_data=profile_data)
+    if not updated_profile:
+        raise HTTPException(status_code=404, detail="Company profile not found")
+    return updated_profile
+
+@app.patch("/universities/me", response_model=schemas.University)
+def update_current_university_profile(profile_data: schemas.UniversityUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.user_type != models.UserType.UNIVERSITY:
+        raise HTTPException(status_code=403, detail="User is not a university")
+    updated_profile = crud.update_university_profile(db, user_id=current_user.id, profile_data=profile_data)
+    if not updated_profile:
+        raise HTTPException(status_code=404, detail="University profile not found")
+    return updated_profile
+
 @app.get("/users/{user_id}", response_model=schemas.User)
 def read_user(user_id: int, db: Session = Depends(get_db)):
     db_user = crud.get_user(db, user_id=user_id)
@@ -167,7 +203,7 @@ def read_conversation(conversation_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Conversation not found")
     return db_conversation
 
-@app.get("/users/{user_id}/conversations/", response_model=list[schemas.Conversation])
+@app.get("/users/{user_id}/conversations/", response_model=list[schemas.ConversationDetail])
 def read_conversations_for_user(user_id: int, db: Session = Depends(get_db)):
     conversations = crud.get_conversations_for_user(db, user_id=user_id)
     return conversations

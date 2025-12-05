@@ -30,9 +30,15 @@ class User(UserBase):
 
 class StudentBase(BaseModel):
     user_id: int
+    skills: Optional[str] = None
+    level: Optional[str] = None
 
 class StudentCreate(StudentBase):
     pass
+
+class StudentUpdate(BaseModel):
+    skills: Optional[str] = None
+    level: Optional[str] = None
 
 class Student(StudentBase):
     id: int
@@ -41,9 +47,15 @@ class Student(StudentBase):
 
 class HighSchoolerBase(BaseModel):
     user_id: int
+    current_school: Optional[str] = None
+    strong_subjects: Optional[str] = None
 
 class HighSchoolerCreate(HighSchoolerBase):
     pass
+
+class HighSchoolerUpdate(BaseModel):
+    current_school: Optional[str] = None
+    strong_subjects: Optional[str] = None
 
 class HighSchooler(HighSchoolerBase):
     id: int
@@ -52,9 +64,15 @@ class HighSchooler(HighSchoolerBase):
 
 class CompanyBase(BaseModel):
     user_id: int
+    industry: Optional[str] = None
+    website: Optional[str] = None
 
 class CompanyCreate(CompanyBase):
     pass
+
+class CompanyUpdate(BaseModel):
+    industry: Optional[str] = None
+    website: Optional[str] = None
 
 class Company(CompanyBase):
     id: int
@@ -64,6 +82,8 @@ class Company(CompanyBase):
 
 class UniversityBase(BaseModel):
     user_id: int
+    accreditations: Optional[str] = None
+    website: Optional[str] = None
 
 class UniversityCreate(UniversityBase):
     pass
@@ -71,6 +91,10 @@ class UniversityCreate(UniversityBase):
 class University(UniversityBase):
     id: int
     formations: list['Formation'] = []
+
+class UniversityUpdate(BaseModel):
+    accreditations: Optional[str] = None
+    website: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -131,6 +155,17 @@ class Message(MessageBase):
     model_config = ConfigDict(from_attributes=True)
 
 Conversation.model_rebuild()
+
+# Schéma pour la réponse de la liste des conversations
+class ConversationDetail(BaseModel):
+    id: int
+    other_participant: User
+    last_message: Optional[Message] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+
 
 # Schéma pour la création d'un match (ce que l'API reçoit)
 class MatchCreate(BaseModel):
