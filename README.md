@@ -83,8 +83,7 @@ rezo-frontend/
 
 ## Liens utiles
 
-- [Backend API Spring Boot](https://github.com/<ton-user>/rezo-backend)
-- [User stories & profils](../rezo-backend/docs/USER_STORIES_AND_USER_PROFILE.md)
+- [User stories & profils](/docs/USER_STORIES)
 - [Guide Flutter officiel](https://docs.flutter.dev/)
 
 ---
