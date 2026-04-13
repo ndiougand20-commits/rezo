@@ -112,5 +112,123 @@ void main() {
       expect(find.widgetWithText(ElevatedButton, 'Connexion'), findsOneWidget);
       expect(find.byType(DashboardScreen), findsNothing);
     });
+
+    testWidgets('profile edit updates visible data immediately', (
+      WidgetTester tester,
+    ) async {
+      final storage = MemoryTokenStorage();
+
+      await tester.pumpWidget(
+        MyApp(authService: FakeAuthService(), tokenStorage: storage),
+      );
+      await tester.pumpAndSettle();
+
+      final loginCta = find.widgetWithText(ElevatedButton, 'Se connecter');
+      await tester.ensureVisible(loginCta);
+      await tester.tap(loginCta, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Adresse e-mail'),
+        'awa@rezo.sn',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Mot de passe'),
+        'SecurePass123!',
+      );
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Connexion'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Profil'));
+      await tester.pumpAndSettle();
+
+      final dashboardContext = tester.element(find.byType(DashboardScreen));
+      await AppScope.of(dashboardContext).updateProfile({'prenom': 'Nina'});
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Nina'), findsWidgets);
+    });
+
+    testWidgets('changing pack updates current pack badge', (
+      WidgetTester tester,
+    ) async {
+      final storage = MemoryTokenStorage();
+
+      await tester.pumpWidget(
+        MyApp(authService: FakeAuthService(), tokenStorage: storage),
+      );
+      await tester.pumpAndSettle();
+
+      final loginCta = find.widgetWithText(ElevatedButton, 'Se connecter');
+      await tester.ensureVisible(loginCta);
+      await tester.tap(loginCta, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Adresse e-mail'),
+        'awa@rezo.sn',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Mot de passe'),
+        'SecurePass123!',
+      );
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Connexion'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Profil'));
+      await tester.pumpAndSettle();
+
+      final dashboardContext = tester.element(find.byType(DashboardScreen));
+      await AppScope.of(dashboardContext).changePack('pack-pro');
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Pack PRO'), findsOneWidget);
+    });
+
+    testWidgets('profile edit blocks invalid phone format', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        MyApp(
+          authService: FakeAuthService(),
+          tokenStorage: MemoryTokenStorage(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final loginCta = find.widgetWithText(ElevatedButton, 'Se connecter');
+      await tester.ensureVisible(loginCta);
+      await tester.tap(loginCta, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Adresse e-mail'),
+        'awa@rezo.sn',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Mot de passe'),
+        'SecurePass123!',
+      );
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Connexion'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.account_circle_rounded));
+      await tester.pumpAndSettle();
+
+      final editCta = find.widgetWithText(ElevatedButton, 'Modifier le profil');
+      await tester.ensureVisible(editCta);
+      await tester.tap(editCta, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Téléphone'),
+        '12',
+      );
+      final formState = tester.state<FormState>(find.byType(Form));
+      expect(formState.validate(), isFalse);
+      await tester.pump();
+
+      expect(find.text('Numéro de téléphone invalide'), findsOneWidget);
+    });
   });
 }
