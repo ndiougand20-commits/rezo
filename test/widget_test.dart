@@ -77,5 +77,40 @@ void main() {
       expect(find.textContaining('Dashboard'), findsOneWidget);
       expect(find.textContaining('ETUDIANT'), findsOneWidget);
     });
+
+    testWidgets('session persisted opens dashboard on app launch', (
+      WidgetTester tester,
+    ) async {
+      final storage = MemoryTokenStorage();
+      await storage.saveToken('persisted-jwt');
+
+      await tester.pumpWidget(
+        MyApp(authService: FakeAuthService(), tokenStorage: storage),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Dashboard'), findsOneWidget);
+      expect(find.byType(NavigationBar), findsOneWidget);
+    });
+
+    testWidgets('dashboard route is protected when user is not authenticated', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        MyApp(
+          authService: FakeAuthService(),
+          tokenStorage: MemoryTokenStorage(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final context = tester.element(find.byType(WelcomeScreen));
+      Navigator.of(context).pushNamed(AppRoutes.dashboard);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'Connexion'), findsOneWidget);
+      expect(find.byType(DashboardScreen), findsNothing);
+    });
   });
 }

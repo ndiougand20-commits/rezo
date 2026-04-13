@@ -90,14 +90,21 @@ abstract class AuthService {
 
   Future<String> login({required String email, required String password});
 
-  Future<Map<String, dynamic>> getMe(String token);
+  Future<Map<String, dynamic>> getMe();
+
+  Future<Map<String, dynamic>> authorizedGet(String path);
 }
 
 class HttpAuthService implements AuthService {
-  HttpAuthService({required this.baseUrl, http.Client? client})
-    : _client = client ?? http.Client();
+  HttpAuthService({
+    required this.baseUrl,
+    required TokenStorage tokenStorage,
+    http.Client? client,
+  }) : _tokenStorage = tokenStorage,
+       _client = client ?? http.Client();
 
   final String baseUrl;
+  final TokenStorage _tokenStorage;
   final http.Client _client;
 
   static String get defaultBaseUrl {
@@ -142,10 +149,16 @@ class HttpAuthService implements AuthService {
   }
 
   @override
-  Future<Map<String, dynamic>> getMe(String token) async {
+  Future<Map<String, dynamic>> getMe() {
+    return authorizedGet('/api/users/me');
+  }
+
+  @override
+  Future<Map<String, dynamic>> authorizedGet(String path) async {
+    final token = await _readRequiredToken();
     final response = await _client
         .get(
-          Uri.parse('$baseUrl/api/users/me'),
+          Uri.parse('$baseUrl$path'),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
@@ -154,6 +167,14 @@ class HttpAuthService implements AuthService {
         .timeout(const Duration(seconds: 12));
 
     return _ensureSuccess(response);
+  }
+
+  Future<String> _readRequiredToken() async {
+    final token = await _tokenStorage.readToken();
+    if (token == null || token.trim().isEmpty) {
+      throw AuthException('Session expirée, reconnecte-toi', statusCode: 401);
+    }
+    return token;
   }
 
   Map<String, dynamic> _ensureSuccess(http.Response response) {
@@ -302,13 +323,13 @@ class AppState extends ChangeNotifier {
         return false;
       }
 
-      final me = await _authService.getMe(savedToken);
+      final me = await _authService.getMe();
       _token = savedToken;
       _currentUser = me;
       _isAuthenticated = true;
       return true;
-    } on AuthException {
-      await _tokenStorage.clearToken();
+    } on AuthException catch (error) {
+      await _clearSessionIfUnauthorized(error);
       _reset();
       return false;
     } catch (_) {
@@ -328,12 +349,17 @@ class AppState extends ChangeNotifier {
   Future<void> login({required String email, required String password}) async {
     final jwt = await _authService.login(email: email, password: password);
     await _tokenStorage.saveToken(jwt);
-    final me = await _authService.getMe(jwt);
+    try {
+      final me = await _authService.getMe();
 
-    _token = jwt;
-    _currentUser = me;
-    _isAuthenticated = true;
-    notifyListeners();
+      _token = jwt;
+      _currentUser = me;
+      _isAuthenticated = true;
+      notifyListeners();
+    } on AuthException catch (error) {
+      await _clearSessionIfUnauthorized(error);
+      rethrow;
+    }
   }
 
   Future<void> logout() async {
@@ -346,6 +372,13 @@ class AppState extends ChangeNotifier {
     _token = null;
     _currentUser = null;
     _isAuthenticated = false;
+  }
+
+  Future<void> _clearSessionIfUnauthorized(AuthException error) async {
+    if (error.statusCode == 401) {
+      await _tokenStorage.clearToken();
+      _reset();
+    }
   }
 }
 
@@ -376,11 +409,15 @@ class _RezoAppState extends State<RezoApp> {
   @override
   void initState() {
     super.initState();
+    final tokenStorage = widget.tokenStorage ?? const SecureTokenStorage();
     _appState = AppState(
       authService:
           widget.authService ??
-          HttpAuthService(baseUrl: HttpAuthService.defaultBaseUrl),
-      tokenStorage: widget.tokenStorage ?? const SecureTokenStorage(),
+          HttpAuthService(
+            baseUrl: HttpAuthService.defaultBaseUrl,
+            tokenStorage: tokenStorage,
+          ),
+      tokenStorage: tokenStorage,
     );
   }
 
@@ -479,6 +516,9 @@ class _RezoAppState extends State<RezoApp> {
                 ),
               );
             case AppRoutes.dashboard:
+              if (!_appState.isAuthenticated) {
+                return MaterialPageRoute(builder: (_) => const LoginScreen());
+              }
               return MaterialPageRoute(builder: (_) => const DashboardScreen());
             default:
               return MaterialPageRoute(builder: (_) => const WelcomeScreen());
@@ -2029,13 +2069,19 @@ class FakeAuthService implements AuthService {
   FakeAuthService({
     this.shouldFailLogin = false,
     this.shouldFailSignup = false,
+    this.shouldFailGetMe = false,
   });
 
   final bool shouldFailLogin;
   final bool shouldFailSignup;
+  final bool shouldFailGetMe;
 
   @override
-  Future<Map<String, dynamic>> getMe(String token) async {
+  Future<Map<String, dynamic>> getMe() async {
+    if (shouldFailGetMe) {
+      throw AuthException('Session expirée, reconnecte-toi', statusCode: 401);
+    }
+
     return {
       'email': 'awa@rezo.sn',
       'prenom': 'Awa',
@@ -2062,5 +2108,10 @@ class FakeAuthService implements AuthService {
     if (shouldFailSignup) {
       throw AuthException('Cet email est déjà utilisé', statusCode: 409);
     }
+  }
+
+  @override
+  Future<Map<String, dynamic>> authorizedGet(String path) {
+    return getMe();
   }
 }
