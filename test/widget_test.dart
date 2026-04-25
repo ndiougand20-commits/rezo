@@ -26,19 +26,13 @@ void main() {
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
-        MyApp(
-          authService: FakeAuthService(),
-          tokenStorage: MemoryTokenStorage(),
+        const MaterialApp(
+          home: SignupScreen(initialRole: UserRole.etudiant),
         ),
       );
       await tester.pumpAndSettle();
 
-      final signupCta = find.widgetWithText(OutlinedButton, 'Créer un compte');
-      await tester.ensureVisible(signupCta);
-      await tester.tap(signupCta, warnIfMissed: false);
-      await tester.pumpAndSettle();
-
-      final formState = tester.state<FormState>(find.byType(Form));
+      final formState = tester.state<FormState>(find.byType(Form).first);
       expect(formState.validate(), isFalse);
       await tester.pump();
 
@@ -229,6 +223,48 @@ void main() {
       await tester.pump();
 
       expect(find.text('Numéro de téléphone invalide'), findsOneWidget);
+    });
+
+    testWidgets('matching tab shows suggestions and reacts to swipe actions', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        MyApp(
+          authService: FakeAuthService(),
+          tokenStorage: MemoryTokenStorage(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final loginCta = find.widgetWithText(ElevatedButton, 'Se connecter');
+      await tester.ensureVisible(loginCta);
+      await tester.tap(loginCta, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Adresse e-mail'),
+        'awa@rezo.sn',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Mot de passe'),
+        'SecurePass123!',
+      );
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Connexion'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Matching'));
+      await tester.pumpAndSettle();
+
+      // New swipe-based design: score badge + circular action buttons
+      expect(find.textContaining('% compatible'), findsWidgets);
+
+      // Tap the like (favorite) circular action button (last of 2 favorite icons)
+      final likeButtons = find.byIcon(Icons.favorite_rounded);
+      expect(likeButtons, findsWidgets);
+      await tester.tap(likeButtons.last);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Ajout\u00e9 \u00e0 tes favoris'), findsOneWidget);
     });
   });
 }
