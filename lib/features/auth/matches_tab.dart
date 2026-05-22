@@ -11,10 +11,288 @@ class _MatchesTabState extends State<_MatchesTab> {
   int _currentIndex = 0;
   int _likedCount = 0;
   int _passedCount = 0;
+  bool _introScheduled = false;
 
   Offset _dragOffset = Offset.zero;
   double _dragAngle = 0;
   bool _isDragging = false;
+
+  bool _isLoading = true;
+  String? _error;
+  List<_MatchItem> _items = const <_MatchItem>[];
+  Map<String, dynamic>? _suggestedPack;
+  Map<String, dynamic>? _trace;
+  bool _suggestedPackDismissed = false;
+  bool _dataLoadScheduled = false;
+  bool _isReplayMode = false;
+  String? _selectedSecteur;
+
+  static const List<String> _secteurOptions = <String>[
+    'Informatique',
+    'Medecine',
+    'Droit',
+    'Commerce',
+    'Ingenierie',
+    'Communication',
+  ];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_introScheduled) {
+      _introScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showMatchingIntro();
+      });
+    }
+    if (!_dataLoadScheduled) {
+      _dataLoadScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _loadRecommendations();
+      });
+    }
+  }
+
+  Future<void> _loadRecommendations({bool includeSwiped = false}) async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _isReplayMode = includeSwiped;
+    });
+    final appState = AppScope.of(context);
+    final user = appState.currentUser ?? const <String, dynamic>{};
+    final role = parseUserRole(user['role'] as String?);
+    try {
+      List<_MatchItem> mapped;
+      Map<String, dynamic>? suggested;
+      if (role == UserRole.lyceen) {
+        final data = await appState.fetchSchoolRecommendations(
+          secteur: _selectedSecteur,
+        );
+        mapped = _mapSchoolRecommendations(data);
+        final rawTrace = data['trace'];
+        if (rawTrace is Map) {
+          _trace = rawTrace.cast<String, dynamic>();
+        } else {
+          _trace = null;
+        }
+      } else if (role == UserRole.ecole || role == UserRole.entreprise) {
+        final data = await appState.fetchProfileRecommendations(
+          includeSwiped: includeSwiped,
+        );
+        mapped = _mapProfileRecommendations(data);
+        final rawTrace = data['trace'];
+        if (rawTrace is Map) {
+          _trace = rawTrace.cast<String, dynamic>();
+        } else {
+          _trace = null;
+        }
+      } else {
+        final data = await appState.fetchRecommendations(
+          includeSwiped: includeSwiped,
+        );
+        mapped = _mapOfferRecommendations(data);
+        final raw = data['suggestedPack'];
+        if (raw is Map) {
+          suggested = raw.cast<String, dynamic>();
+        }
+        final rawTrace = data['trace'];
+        if (rawTrace is Map) {
+          _trace = rawTrace.cast<String, dynamic>();
+        } else {
+          _trace = null;
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _items = mapped;
+        _suggestedPack = suggested;
+        _isLoading = false;
+        _currentIndex = 0;
+        _likedCount = 0;
+        _passedCount = 0;
+      });
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = e.message;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = 'Impossible de charger les recommandations';
+      });
+    }
+  }
+
+  List<_MatchItem> _mapOfferRecommendations(Map<String, dynamic> data) {
+    final list = data['recommendations'];
+    if (list is! List) return const <_MatchItem>[];
+    final palette = const [
+      Color(0xFFEEEEEE),
+      Color(0xFFE8E8E8),
+      Color(0xFFF0F0F0),
+      Color(0xFFE3E3E3),
+    ];
+    final result = <_MatchItem>[];
+    var i = 0;
+    for (final entry in list) {
+      if (entry is! Map) continue;
+      final item = entry.cast<String, dynamic>();
+      final offer = (item['offer'] as Map?)?.cast<String, dynamic>() ??
+          const <String, dynamic>{};
+      final reasonsRaw = item['reasons'];
+      final reasons = reasonsRaw is List
+          ? reasonsRaw.map((e) => e.toString()).toList()
+          : <String>[];
+      final compsRaw = offer['competencesRequises'];
+      final comps = compsRaw is List
+          ? compsRaw.map((e) => e.toString()).toList()
+          : <String>[];
+      final tags = <String>[
+        if (offer['domaine'] != null) offer['domaine'].toString(),
+        ...comps.take(2),
+      ];
+      final owner = offer['ownerDisplayName']?.toString() ?? '—';
+      final location = offer['location']?.toString() ?? '—';
+      final type = offer['type']?.toString() ?? 'OPPORTUNITE';
+      result.add(_MatchItem(
+        offerId: item['offerId']?.toString() ?? offer['id']?.toString(),
+        title: offer['titre']?.toString() ?? 'Sans titre',
+        subtitle: '$owner â€¢ $location',
+        score: (item['score'] is num)
+            ? (item['score'] as num).round()
+            : int.tryParse('${item['score']}') ?? 0,
+        owner: owner,
+        location: location,
+        typeLabel: type,
+        accent: palette[i % palette.length],
+        tags: tags,
+        reasons: reasons,
+        description: offer['description']?.toString() ?? '',
+      ));
+      i++;
+    }
+    return result;
+  }
+
+  List<_MatchItem> _mapSchoolRecommendations(Map<String, dynamic> data) {
+    final list = data['recommendations'];
+    if (list is! List) return const <_MatchItem>[];
+    final palette = const [
+      Color(0xFFEEEEEE),
+      Color(0xFFF0F0F0),
+      Color(0xFFE8E8E8),
+    ];
+    final result = <_MatchItem>[];
+    var i = 0;
+    for (final entry in list) {
+      if (entry is! Map) continue;
+      final item = entry.cast<String, dynamic>();
+      final school = (item['school'] as Map?)?.cast<String, dynamic>() ??
+          const <String, dynamic>{};
+      final reasonsRaw = item['reasons'];
+      final reasons = reasonsRaw is List
+          ? reasonsRaw.map((e) => e.toString()).toList()
+          : <String>[];
+      final domainesRaw = school['domaines'];
+      final domaines = domainesRaw is List
+          ? domainesRaw.map((e) => e.toString()).toList()
+          : <String>[];
+      result.add(_MatchItem(
+        title: school['nomEtablissement']?.toString() ?? 'Ecole',
+        subtitle:
+            '${school['statut'] ?? ''} â€¢ ${school['adresse'] ?? ''}'.trim(),
+        score: (item['score'] is num)
+            ? (item['score'] as num).round()
+            : 0,
+        owner: school['nomEtablissement']?.toString() ?? '—',
+        location: school['adresse']?.toString() ?? '—',
+        typeLabel: 'ECOLE',
+        accent: palette[i % palette.length],
+        tags: domaines.take(3).toList(),
+        reasons: reasons,
+        description: school['description']?.toString() ?? '',
+      ));
+      i++;
+    }
+    return result;
+  }
+
+  List<_MatchItem> _mapProfileRecommendations(Map<String, dynamic> data) {
+    final list = data['recommendations'];
+    if (list is! List) return const <_MatchItem>[];
+    final palette = const [
+      Color(0xFFF0F0F0),
+      Color(0xFFECECEC),
+      Color(0xFFE8E8E8),
+      Color(0xFFF4F4F4),
+    ];
+    final result = <_MatchItem>[];
+    var i = 0;
+    for (final entry in list) {
+      if (entry is! Map) continue;
+      final item = entry.cast<String, dynamic>();
+      final reasonsRaw = item['reasons'];
+      final reasons = reasonsRaw is List
+          ? reasonsRaw.map((e) => e.toString()).toList()
+          : <String>[];
+      final competencesRaw = item['competences'];
+      final competences = competencesRaw is List
+          ? competencesRaw.map((e) => e.toString()).toList()
+          : <String>[];
+      final mediaRaw = item['mediaFiles'];
+      final media = mediaRaw is List ? mediaRaw.whereType<Map>().toList() : const <Map>[];
+      final categories = media
+          .map((m) => m['category']?.toString().toUpperCase() ?? '')
+          .where((c) => c.isNotEmpty)
+          .toSet();
+
+      final docTags = <String>[
+        if (categories.contains('CV')) 'CV',
+        if (categories.contains('LM')) 'LM',
+        if (categories.contains('DIPLOME')) 'Diplome',
+        if (categories.contains('BULLETIN')) 'Bulletin',
+      ];
+
+      final prenom = item['prenom']?.toString().trim() ?? '';
+      final nom = item['nom']?.toString().trim() ?? '';
+      final fullName = ('$prenom $nom').trim().isEmpty
+          ? 'Profil'
+          : ('$prenom $nom').trim();
+      final niveau = item['niveauEtude']?.toString() ?? '';
+      final domaine = item['domaine']?.toString() ?? '';
+      final subtitle = [niveau, domaine].where((e) => e.trim().isNotEmpty).join(' • ');
+      final tags = <String>[
+        if (domaine.trim().isNotEmpty) domaine,
+        ...competences.take(3),
+        ...docTags,
+      ];
+
+      result.add(_MatchItem(
+        title: fullName,
+        subtitle: subtitle.isEmpty ? 'Profil recommande' : subtitle,
+        score: (item['score'] is num)
+            ? (item['score'] as num).round()
+            : int.tryParse('${item['score']}') ?? 0,
+        owner: fullName,
+        location: item['location']?.toString() ?? '—',
+        typeLabel: 'PROFIL',
+        accent: palette[i % palette.length],
+        tags: tags,
+        reasons: reasons,
+        description: item['objectif']?.toString() ?? '',
+        targetUserId: item['userId']?.toString(),
+      ));
+      i++;
+    }
+    return result;
+  }
 
   void _onPanStart(DragStartDetails _) {
     setState(() => _isDragging = true);
@@ -30,7 +308,13 @@ class _MatchesTabState extends State<_MatchesTab> {
   void _onPanEnd(DragEndDetails _, int total) {
     final dx = _dragOffset.dx;
     if (dx.abs() > 100) {
-      _swipe(liked: dx > 0, total: total);
+      final current = _currentIndex < _items.length ? _items[_currentIndex] : null;
+      _swipe(
+        liked: dx > 0,
+        total: total,
+        offerId: current?.offerId,
+        targetUserId: current?.targetUserId,
+      );
     }
     setState(() {
       _dragOffset = Offset.zero;
@@ -39,7 +323,12 @@ class _MatchesTabState extends State<_MatchesTab> {
     });
   }
 
-  void _swipe({required bool liked, required int total}) {
+  void _swipe({
+    required bool liked,
+    required int total,
+    String? offerId,
+    String? targetUserId,
+  }) {
     final nextIndex = _currentIndex + 1;
     setState(() {
       if (liked) {
@@ -52,6 +341,26 @@ class _MatchesTabState extends State<_MatchesTab> {
       _dragAngle = 0;
       _isDragging = false;
     });
+
+    // Fire-and-forget: enregistrer le swipe cote backend (ignorer les erreurs).
+    if (offerId != null && offerId.isNotEmpty) {
+      final appState = AppScope.of(context);
+      unawaited(
+        appState
+            .recordSwipe(offerId: offerId, action: liked ? 'LIKE' : 'DISLIKE')
+            .catchError((Object _) => <String, dynamic>{}),
+      );
+    } else if (targetUserId != null && targetUserId.isNotEmpty) {
+      final appState = AppScope.of(context);
+      unawaited(
+        appState
+            .recordProfileSwipe(
+              targetUserId: targetUserId,
+              action: liked ? 'LIKE' : 'DISLIKE',
+            )
+            .catchError((Object _) => <String, dynamic>{}),
+      );
+    }
 
     if (!mounted) return;
 
@@ -70,7 +379,7 @@ class _MatchesTabState extends State<_MatchesTab> {
     });
   }
 
-  void _showMatchDetail(_MockMatch match) {
+  void _showMatchDetail(_MatchItem match) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -81,33 +390,95 @@ class _MatchesTabState extends State<_MatchesTab> {
     );
   }
 
+  Future<void> _showMatchingIntro() {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: Color(0xFFE0E0E0)),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+          contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+          title: const Text(
+            'Comment fonctionne le matching',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Decouvre chaque profil une carte a la fois.',
+                style: TextStyle(height: 1.4),
+              ),
+              SizedBox(height: 16),
+              _IntroStep(
+                icon: Icons.swipe_right_rounded,
+                title: 'Glisse a droite',
+                subtitle: 'pour garder une opportunite dans tes favoris.',
+              ),
+              SizedBox(height: 12),
+              _IntroStep(
+                icon: Icons.swipe_left_rounded,
+                title: 'Glisse a gauche',
+                subtitle: 'pour passer a la suggestion suivante.',
+              ),
+              SizedBox(height: 12),
+              _IntroStep(
+                icon: Icons.info_outline_rounded,
+                title: 'Ouvre le detail',
+                subtitle: 'pour comprendre pourquoi le profil te correspond.',
+              ),
+            ],
+          ),
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('J\'ai compris'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final user = AppScope.of(context).currentUser ?? const <String, dynamic>{};
-    final role = parseUserRole(user['role'] as String?);
-    final profile =
-        (user['profil'] as Map?)?.cast<String, dynamic>() ??
-        const <String, dynamic>{};
-    final recommendations = _buildRecommendations(
-      role: role,
-      user: user,
-      profile: profile,
-    );
-
-    if (recommendations.isEmpty) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.swipe_rounded, size: 64,
-                  color: Theme.of(context).colorScheme.primary.withAlpha(80)),
+              const Icon(Icons.error_outline_rounded, size: 56, color: Colors.black54),
+              const SizedBox(height: 12),
+              Text(_error!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              const Text(
-                'Compl\u00e8te ton profil pour\nd\u00e9bloquer les suggestions',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, height: 1.4),
+              FilledButton.icon(
+                onPressed: _loadRecommendations,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('R\u00e9essayer'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                ),
               ),
             ],
           ),
@@ -115,39 +486,65 @@ class _MatchesTabState extends State<_MatchesTab> {
       );
     }
 
+    final recommendations = _items;
+    final appState = AppScope.of(context);
+    final role = parseUserRole(appState.currentUser?['role'] as String?);
+
+    if (recommendations.isEmpty) {
+      final emptyMessage = _buildEmptyMessage(role);
+      final canReplay = _canReplay(role);
+      return RefreshIndicator(
+        onRefresh: () => _loadRecommendations(includeSwiped: _isReplayMode),
+        child: ListView(
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.6,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.swipe_rounded,
+                          size: 64,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withAlpha(80)),
+                      const SizedBox(height: 16),
+                      Text(
+                        emptyMessage,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16, height: 1.4),
+                      ),
+                      if (canReplay) ...[
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: () => _loadRecommendations(includeSwiped: true),
+                          icon: const Icon(Icons.replay_rounded),
+                          label: const Text('Reparcourir les opportunites'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final hasCurrent = _currentIndex < recommendations.length;
     final current = hasCurrent ? recommendations[_currentIndex] : null;
-    final remaining = recommendations.length - _currentIndex;
-
     return Column(
       children: [
-        // Stats bar
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _MiniStat(
-                icon: Icons.local_fire_department_rounded,
-                value: hasCurrent ? '$remaining' : '0',
-                color: const Color(0xFFFF9800),
-              ),
-              const SizedBox(width: 24),
-              _MiniStat(
-                icon: Icons.favorite_rounded,
-                value: '$_likedCount',
-                color: const Color(0xFFE91E63),
-              ),
-              const SizedBox(width: 24),
-              _MiniStat(
-                icon: Icons.close_rounded,
-                value: '$_passedCount',
-                color: const Color(0xFF90A4AE),
-              ),
-            ],
-          ),
-        ),
-
+        if (role == UserRole.lyceen)
+          _buildSecteurFilters(),
         // Swipe area
         Expanded(
           child: current != null
@@ -155,50 +552,164 @@ class _MatchesTabState extends State<_MatchesTab> {
               : _buildSessionEnd(recommendations.length),
         ),
 
-        // Action buttons
+        // Match actions
         if (current != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(40, 0, 40, 24),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: Column(
               children: [
-                _CircleActionButton(
-                  icon: Icons.close_rounded,
-                  color: const Color(0xFFFF5252),
-                  size: 64,
-                  onPressed: () =>
-                      _swipe(liked: false, total: recommendations.length),
+                const Text(
+                  'Glisse la carte pour choisir, ou ouvre le detail.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF616161),
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-                _CircleActionButton(
-                  icon: Icons.info_outline_rounded,
-                  color: const Color(0xFF000000),
-                  size: 48,
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
                   onPressed: () => _showMatchDetail(current),
-                ),
-                _CircleActionButton(
-                  icon: Icons.favorite_rounded,
-                  color: const Color(0xFF4CAF50),
-                  size: 64,
-                  onPressed: () =>
-                      _swipe(liked: true, total: recommendations.length),
+                  icon: const Icon(Icons.info_outline_rounded, size: 18),
+                  label: const Text('Voir le detail'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.black,
+                    side: const BorderSide(color: Color(0xFFD0D0D0)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 14,
+                    ),
+                  ),
                 ),
               ],
             ),
           )
         else
-          Padding(
-            padding: const EdgeInsets.fromLTRB(40, 0, 40, 24),
-            child: ElevatedButton.icon(
-              onPressed: _resetSession,
-              icon: const Icon(Icons.replay_rounded),
-              label: const Text('Rejouer'),
-            ),
-          ),
+              const SizedBox(height: 24),
+        if (_suggestedPack != null && !_suggestedPackDismissed)
+          _buildSuggestedPackBanner(),
       ],
     );
   }
 
-  Widget _buildSwipeCard(_MockMatch match, int total) {
+  Widget _buildSecteurFilters() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      child: SizedBox(
+        height: 38,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: const Text('Tous'),
+                selected: _selectedSecteur == null,
+                onSelected: (_) {
+                  if (_selectedSecteur == null) return;
+                  setState(() => _selectedSecteur = null);
+                  _loadRecommendations();
+                },
+              ),
+            ),
+            ..._secteurOptions.map(
+              (secteur) => Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(secteur),
+                  selected: _selectedSecteur == secteur,
+                  onSelected: (_) {
+                    if (_selectedSecteur == secteur) return;
+                    setState(() => _selectedSecteur = secteur);
+                    _loadRecommendations();
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _buildEmptyMessage(UserRole role) {
+    final trace = _trace ?? const <String, dynamic>{};
+    final hasAccess = trace['hasOpportunityAccess'];
+    final availableOfferCount = (trace['availableOfferCount'] as num?)?.toInt();
+    final excludedSwipeCount = (trace['excludedSwipeCount'] as num?)?.toInt() ?? 0;
+    final evaluatedCount = (trace['evaluatedCount'] as num?)?.toInt() ?? 0;
+
+    if (role == UserRole.lyceen) {
+      return 'Aucune ecole recommandee pour le moment.\nReessaie plus tard ou ajuste tes centres d\'interet.';
+    }
+
+    if (hasAccess is bool && !hasAccess) {
+      return 'Ton pack actuel ne permet pas d\'afficher les opportunites.\nPasse a une offre avec matching pour debloquer les suggestions.';
+    }
+
+    if (availableOfferCount != null && availableOfferCount == 0) {
+      return 'Aucune opportunite publiee pour le moment.\nReviens plus tard.';
+    }
+
+    if (evaluatedCount == 0 && excludedSwipeCount > 0 && !_isReplayMode) {
+      return 'Tu as deja parcouru toutes les opportunites disponibles.\nDe nouvelles suggestions arrivent bientot.';
+    }
+
+    if (_isReplayMode) {
+      return 'Aucune opportunite a reparcourir pour le moment.\nReessaie plus tard.';
+    }
+
+    return 'Aucune suggestion disponible pour le moment.\nReessaie dans quelques instants.';
+  }
+
+  bool _canReplay(UserRole role) {
+    if (role == UserRole.lyceen || _isReplayMode) return false;
+    final trace = _trace ?? const <String, dynamic>{};
+    final excludedSwipeCount = (trace['excludedSwipeCount'] as num?)?.toInt() ?? 0;
+    final hasAccess = trace['hasOpportunityAccess'];
+    return excludedSwipeCount > 0 && (hasAccess is! bool || hasAccess);
+  }
+
+  Widget _buildSuggestedPackBanner() {
+    final label = _suggestedPack?['label']?.toString() ?? 'sup\u00e9rieur';
+    final reason = _suggestedPack?['reason']?.toString() ?? '';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.workspace_premium_rounded, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Pack sugg\u00e9r\u00e9 : $label',
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                ),
+                if (reason.isNotEmpty)
+                  Text(reason,
+                      style: const TextStyle(fontSize: 12, color: Colors.black54)),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close_rounded, size: 18),
+            onPressed: () => setState(() => _suggestedPackDismissed = true),
+            tooltip: 'Masquer',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSwipeCard(_MatchItem match, int total) {
     final swipeProgress = (_dragOffset.dx / 150).clamp(-1.0, 1.0);
     final likeOpacity = swipeProgress > 0 ? swipeProgress : 0.0;
     final passOpacity = swipeProgress < 0 ? -swipeProgress : 0.0;
@@ -418,28 +929,94 @@ class _MatchesTabState extends State<_MatchesTab> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.check_circle_outline_rounded,
-              size: 64,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '$total profils parcourus',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFAFAFA),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: const Color(0xFFE3E3E3)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(10),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '$_likedCount aim\u00e9s  \u2022  $_passedCount pass\u00e9s',
-              style: const TextStyle(fontSize: 15, color: Colors.black54),
-            ),
-          ],
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 84,
+                height: 84,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFE0E0E0)),
+                ),
+                child: Icon(
+                  Icons.check_circle_outline_rounded,
+                  size: 40,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                '$total profils parcourus',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$_likedCount aimÃ©s  â€¢  $_passedCount passÃ©s',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 15, color: Colors.black54),
+              ),
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF111111), Color(0xFF2A2A2A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(28),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: ElevatedButton.icon(
+                    onPressed: _resetSession,
+                    icon: const Icon(Icons.replay_rounded, size: 18),
+                    label: const Text('Rejouer les profils'),
+                    style: ElevatedButton.styleFrom(
+                      elevation: 0,
+                      shadowColor: Colors.transparent,
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -453,237 +1030,48 @@ class _MatchesTabState extends State<_MatchesTab> {
     return name.isNotEmpty ? name[0].toUpperCase() : '?';
   }
 
-  List<_MockMatch> _buildRecommendations({
-    required UserRole role,
-    required Map<String, dynamic> user,
-    required Map<String, dynamic> profile,
-  }) {
-    final domain =
-        profile['domaine']?.toString() ??
-        profile['secteurActivite']?.toString() ??
-        'Informatique';
-    final objective =
-        profile['objectif']?.toString() ??
-        profile['objectifPostbac']?.toString() ??
-        'D\u00e9couvrir les meilleures opportunit\u00e9s';
 
-    switch (role) {
-      case UserRole.etudiant:
-        return [
-          _MockMatch(
-            title: 'Stage Flutter Product Builder',
-            subtitle: 'Startup SaaS \u2022 Dakar \u2022 Stage 6 mois',
-            score: 92,
-            owner: 'Nova Tech',
-            location: 'Dakar',
-            typeLabel: 'STAGE',
-            accent: const Color(0xFFF0F0F0),
-            tags: ['Flutter', domain, 'Product'],
-            reasons: [
-              'domaine compatible',
-              '2 comp\u00e9tences en commun',
-              'objectif coh\u00e9rent',
-            ],
-            description:
-                'Une opportunit\u00e9 orient\u00e9e mobile et produit pour construire une vraie exp\u00e9rience terrain.',
-          ),
-          _MockMatch(
-            title: 'Alternance Data & IA appliqu\u00e9e',
-            subtitle: 'Cabinet innovation \u2022 Remote hybride',
-            score: 84,
-            owner: 'Insight Lab',
-            location: 'Remote',
-            typeLabel: 'ALTERNANCE',
-            accent: const Color(0xFFE8E8E8),
-            tags: ['Python', 'Data', objective],
-            reasons: [
-              'objectif professionnel proche',
-              'localisation pr\u00e9f\u00e9r\u00e9e',
-              'fort potentiel d\u2019\u00e9volution',
-            ],
-            description:
-                'Un parcours id\u00e9al pour muscler ton profil technique et ton exposition m\u00e9tier.',
-          ),
-        ];
-      case UserRole.lyceen:
-        return [
-          _MockMatch(
-            title: 'Licence Informatique - Parcours d\u00e9veloppeur',
-            subtitle: '\u00c9cole sup\u00e9rieure \u2022 Bac+3 \u2022 Admission sur dossier',
-            score: 90,
-            owner: 'Institut Num\u00e9ria',
-            location: 'Abidjan',
-            typeLabel: 'FORMATION',
-            accent: const Color(0xFFEEEEEE),
-            tags: ['Post-bac', 'Programmation', 'Orientation'],
-            reasons: [
-              'orientation compatible',
-              'projet post-bac coh\u00e9rent',
-              'centres d\u2019int\u00e9r\u00eat align\u00e9s',
-            ],
-            description:
-                'Une proposition pens\u00e9e pour un profil attir\u00e9 par le num\u00e9rique et la progression par projets.',
-          ),
-          _MockMatch(
-            title: 'Bachelor Business & Tech',
-            subtitle: '\u00c9cole priv\u00e9e \u2022 Parcours hybride',
-            score: 76,
-            owner: 'Campus Horizon',
-            location: 'Cotonou',
-            typeLabel: 'FORMATION',
-            accent: const Color(0xFFF0F0F0),
-            tags: ['Post-bac', 'Innovation', 'Projet'],
-            reasons: [
-              'bonne projection m\u00e9tier',
-              'programme accessible',
-              'd\u00e9couverte progressive des sp\u00e9cialisations',
-            ],
-            description:
-                'Une option plus large pour garder plusieurs portes ouvertes apr\u00e8s le bac.',
-          ),
-        ];
-      case UserRole.emploi:
-        return [
-          _MockMatch(
-            title: 'D\u00e9veloppeur full stack confirm\u00e9',
-            subtitle: 'CDI \u2022 Produit digital \u2022 Paris',
-            score: 88,
-            owner: 'Kora Digital',
-            location: 'Paris',
-            typeLabel: 'EMPLOI',
-            accent: const Color(0xFFE8E8E8),
-            tags: [domain, 'CDI', 'Remote partiel'],
-            reasons: [
-              'exp\u00e9riences compatibles',
-              'secteur align\u00e9',
-              'objectif professionnel coh\u00e9rent',
-            ],
-            description:
-                'Un poste qui valorise l\u2019exp\u00e9rience existante tout en offrant une vraie marge de progression.',
-          ),
-          _MockMatch(
-            title: 'Product engineer mobile',
-            subtitle: 'Scale-up \u2022 Mobile \u2022 T\u00e9l\u00e9travail',
-            score: 81,
-            owner: 'Wave Product',
-            location: 'T\u00e9l\u00e9travail',
-            typeLabel: 'EMPLOI',
-            accent: const Color(0xFFF0F0F0),
-            tags: ['Produit', 'Mobile', 'Impact'],
-            reasons: [
-              'stack coh\u00e9rente',
-              'r\u00f4le compatible avec le profil',
-              'environnement de travail attractif',
-            ],
-            description:
-                'Une opportunit\u00e9 orient\u00e9e livraison produit et impact direct sur les utilisateurs.',
-          ),
-        ];
-      case UserRole.entreprise:
-        return [
-          _MockMatch(
-            title: 'A\u00efcha Ndiaye',
-            subtitle:
-                'Profil tech \u2022 Flutter / Backend \u2022 Disponible en 30 jours',
-            score: 91,
-            owner: 'Candidate matching',
-            location: 'Dakar',
-            typeLabel: 'PROFIL',
-            accent: const Color(0xFFEEEEEE),
-            tags: ['Flutter', 'API', 'Stage/CDI'],
-            reasons: [
-              'comp\u00e9tences proches de vos besoins',
-              'mobilit\u00e9 compatible',
-              'bon potentiel de conversion',
-            ],
-            description:
-                'Une candidate pertinente pour pr\u00e9parer la future vue de recrutement entreprise.',
-          ),
-          _MockMatch(
-            title: 'Moussa Traor\u00e9',
-            subtitle: 'Profil data \u2022 Python / SQL \u2022 Exp\u00e9rience junior',
-            score: 78,
-            owner: 'Candidate matching',
-            location: 'Abidjan',
-            typeLabel: 'PROFIL',
-            accent: const Color(0xFFF0F0F0),
-            tags: ['Python', 'SQL', 'Data'],
-            reasons: [
-              'secteur compatible',
-              'profil \u00e9volutif',
-              'bonne couverture des besoins cl\u00e9s',
-            ],
-            description:
-                'Un profil \u00e0 garder sous la main pour les prochains besoins data ou analytics.',
-          ),
-        ];
-      case UserRole.ecole:
-        return [
-          _MockMatch(
-            title: 'Profil orient\u00e9 ing\u00e9nierie logicielle',
-            subtitle: 'Terminale \u2022 app\u00e9tence num\u00e9rique \u2022 post-bac cibl\u00e9',
-            score: 89,
-            owner: 'Candidat orientation',
-            location: 'Lom\u00e9',
-            typeLabel: 'CANDIDAT',
-            accent: const Color(0xFFEEEEEE),
-            tags: ['Orientation', 'Programmation', 'Admission'],
-            reasons: [
-              'objectif post-bac align\u00e9',
-              'programme compatible',
-              'fort potentiel d\u2019ad\u00e9quation',
-            ],
-            description:
-                'Une premi\u00e8re simulation du type de profil que ton \u00e9tablissement pourrait souhaiter attirer.',
-          ),
-          _MockMatch(
-            title: 'Profil business & num\u00e9rique',
-            subtitle: 'Bac+2 \u2022 reconversion \u2022 forte motivation',
-            score: 74,
-            owner: 'Candidat orientation',
-            location: 'Cotonou',
-            typeLabel: 'CANDIDAT',
-            accent: const Color(0xFFF0F0F0),
-            tags: ['Reconversion', 'Formation', 'Business'],
-            reasons: [
-              'profil atypique int\u00e9ressant',
-              'bonne coh\u00e9rence avec une offre hybride',
-              'fort engagement projet\u00e9',
-            ],
-            description:
-                'Un profil utile pour pr\u00e9parer la future logique d\u2019attraction et d\u2019admission.',
-          ),
-        ];
-    }
-  }
 }
 
 // Supporting widgets
 
-class _MiniStat extends StatelessWidget {
-  const _MiniStat({
+class _IntroStep extends StatelessWidget {
+  const _IntroStep({
     required this.icon,
-    required this.value,
-    required this.color,
+    required this.title,
+    required this.subtitle,
   });
 
   final IconData icon;
-  final String value;
-  final Color color;
+  final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 15,
-            color: color,
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, size: 18, color: Colors.black),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 2),
+              Text(subtitle, style: const TextStyle(height: 1.35)),
+            ],
           ),
         ),
       ],
@@ -691,46 +1079,8 @@ class _MiniStat extends StatelessWidget {
   }
 }
 
-class _CircleActionButton extends StatelessWidget {
-  const _CircleActionButton({
-    required this.icon,
-    required this.color,
-    required this.size,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final Color color;
-  final double size;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white,
-          border: Border.all(color: color.withAlpha(60), width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: color.withAlpha(30),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Icon(icon, color: color, size: size * 0.45),
-      ),
-    );
-  }
-}
-
-class _MockMatch {
-  const _MockMatch({
+class _MatchItem {
+  const _MatchItem({
     required this.title,
     required this.subtitle,
     required this.score,
@@ -741,6 +1091,8 @@ class _MockMatch {
     required this.tags,
     required this.reasons,
     required this.description,
+    this.offerId,
+    this.targetUserId,
   });
 
   final String title;
@@ -753,12 +1105,14 @@ class _MockMatch {
   final List<String> tags;
   final List<String> reasons;
   final String description;
+  final String? offerId;
+  final String? targetUserId;
 }
 
 class _MatchDetailSheet extends StatelessWidget {
   const _MatchDetailSheet({required this.match});
 
-  final _MockMatch match;
+  final _MatchItem match;
 
   @override
   Widget build(BuildContext context) {
@@ -786,8 +1140,8 @@ class _MatchDetailSheet extends StatelessWidget {
             // Avatar circle
             Center(
               child: Container(
-                width: 90,
-                height: 90,
+                width: 160,
+                height: 160,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
@@ -795,7 +1149,10 @@ class _MatchDetailSheet extends StatelessWidget {
                       match.accent,
                       Theme.of(context).colorScheme.primaryContainer,
                     ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
+                  border: Border.all(color: const Color(0xFFE0E0E0), width: 3),
                 ),
                 child: Center(
                   child: Text(

@@ -10,7 +10,7 @@ import 'features/auth/auth_flow.dart'
         HttpAuthService,
         SecureTokenStorage;
 
-const _useFakeAuth = bool.fromEnvironment('USE_FAKE_AUTH', defaultValue: true);
+const _useFakeAuth = bool.fromEnvironment('USE_FAKE_AUTH', defaultValue: false);
 
 final _tokenStorage = _useFakeAuth
     ? MemoryTokenStorage()

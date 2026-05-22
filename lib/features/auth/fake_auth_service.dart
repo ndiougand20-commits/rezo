@@ -113,10 +113,15 @@ class FakeAuthService implements AuthService {
   Future<Map<String, dynamic>> uploadJustificatifPdf({
     required Uint8List bytes,
     required String fileName,
+    String? category,
   }) async {
+    final normalizedCategory =
+        (category == null || category.trim().isEmpty)
+        ? 'JUSTIFICATIF_PDF'
+        : category.trim().toUpperCase();
     final media = {
       'id': DateTime.now().microsecondsSinceEpoch.toString(),
-      'category': 'JUSTIFICATIF_PDF',
+      'category': normalizedCategory,
       'originalFileName': fileName,
       'contentType': 'application/pdf',
       'fileUrl': '/uploads/users/${_user['id']}/justificatifs/$fileName',
@@ -186,6 +191,217 @@ class FakeAuthService implements AuthService {
         'datePublication': '2026-04-10T08:00:00',
       },
     ];
+  }
+
+  // ---- Matching ----
+  @override
+  Future<Map<String, dynamic>> fetchRecommendations({bool includeSwiped = false}) async {
+    return <String, dynamic>{
+      'recommendations': <Map<String, dynamic>>[],
+      'suggestedPack': null,
+      'trace': <String, dynamic>{},
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> recordSwipe({
+    required String offerId,
+    required String action,
+  }) async {
+    return <String, dynamic>{
+      'swipeId': '00000000-0000-0000-0000-000000000000',
+      'offerId': offerId,
+      'action': action,
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> fetchSchoolRecommendations({String? secteur}) async {
+    return <String, dynamic>{
+      'secteur': secteur,
+      'recommendations': <Map<String, dynamic>>[],
+      'trace': <String, dynamic>{},
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> fetchProfileRecommendations({
+    bool includeSwiped = false,
+  }) async {
+    return <String, dynamic>{
+      'includeSwiped': includeSwiped,
+      'recommendations': <Map<String, dynamic>>[],
+      'trace': <String, dynamic>{},
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> recordProfileSwipe({
+    required String targetUserId,
+    required String action,
+  }) async {
+    return <String, dynamic>{
+      'id': DateTime.now().microsecondsSinceEpoch.toString(),
+      'targetUserId': targetUserId,
+      'action': action,
+      'createdAt': DateTime.now().toIso8601String(),
+    };
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchMutualMatches() async {
+    return <Map<String, dynamic>>[];
+  }
+
+  @override
+  Future<Map<String, dynamic>> fetchMyStats() async {
+    return <String, dynamic>{
+      'matchCount': 0,
+      'likesSent': 0,
+      'likesReceived': 0,
+      'offerCount': 0,
+      'unreadMessages': 0,
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> sendChatMessage({
+    required String message,
+    required String sessionId,
+    String? context,
+  }) async {
+    return <String, dynamic>{
+      'userMessage': message,
+      'iaResponse': 'Assistant indisponible en mode fake.',
+      'sessionId': sessionId,
+      'context': context,
+    };
+  }
+
+  // ---- Messagerie ----
+  @override
+  Future<Map<String, dynamic>> sendMessage({
+    required String receiverId,
+    required String content,
+    String? relatedOfferId,
+  }) async {
+    return <String, dynamic>{
+      'id': DateTime.now().microsecondsSinceEpoch.toString(),
+      'receiverId': receiverId,
+      'content': content,
+      'relatedOfferId': relatedOfferId,
+      'isRead': false,
+      'createdAt': DateTime.now().toIso8601String(),
+    };
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getConversation(String userId) async {
+    return <Map<String, dynamic>>[];
+  }
+
+  @override
+  Future<Map<String, dynamic>> markMessageRead(String messageId) async {
+    return <String, dynamic>{'id': messageId, 'isRead': true};
+  }
+
+  @override
+  Future<void> deleteMessage(String messageId) async {}
+
+  // ---- Offres CRUD ----
+  @override
+  Future<Map<String, dynamic>> createOffer(Map<String, dynamic> payload) async {
+    return <String, dynamic>{
+      'id': DateTime.now().microsecondsSinceEpoch.toString(),
+      ...payload,
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateOffer(
+    String offerId,
+    Map<String, dynamic> payload,
+  ) async {
+    return <String, dynamic>{'id': offerId, ...payload};
+  }
+
+  @override
+  Future<void> deleteOffer(String offerId) async {}
+
+  @override
+  Future<Map<String, dynamic>> uploadOfferPdf({
+    required String offerId,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    return <String, dynamic>{
+      'offerId': offerId,
+      'pdfUrl': '/uploads/offers/$offerId/$fileName',
+      'fileName': fileName,
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> getOfferLikedBy(String offerId) async {
+    return <String, dynamic>{
+      'offerId': offerId,
+      'count': 0,
+      'likers': <Map<String, dynamic>>[],
+    };
+  }
+
+  // ---- Schools ----
+  @override
+  Future<List<Map<String, dynamic>>> listSchools() async => <Map<String, dynamic>>[];
+
+  @override
+  Future<Map<String, dynamic>> createSchool(Map<String, dynamic> payload) async {
+    return <String, dynamic>{
+      'id': DateTime.now().microsecondsSinceEpoch.toString(),
+      'ownerUserId': _user['id'],
+      ...payload,
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateSchool(
+    String schoolId,
+    Map<String, dynamic> payload,
+  ) async {
+    return <String, dynamic>{'id': schoolId, ...payload};
+  }
+
+  // ---- Companies ----
+  @override
+  Future<List<Map<String, dynamic>>> listCompanies() async => <Map<String, dynamic>>[];
+
+  @override
+  Future<Map<String, dynamic>> createCompany(Map<String, dynamic> payload) async {
+    return <String, dynamic>{
+      'id': DateTime.now().microsecondsSinceEpoch.toString(),
+      'ownerUserId': _user['id'],
+      ...payload,
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateCompany(
+    String companyId,
+    Map<String, dynamic> payload,
+  ) async {
+    return <String, dynamic>{'id': companyId, ...payload};
+  }
+
+  // ---- Feature access ----
+  @override
+  Future<Map<String, dynamic>> getFeatureAccess() async {
+    return <String, dynamic>{
+      'packNom': _user['packNom'],
+      'canViewOpportunities': true,
+      'canManageOffers': _user['canManageOffers'] ?? false,
+      'canUseMessaging': true,
+      'canUseAiChat': false,
+    };
   }
 
   Map<String, dynamic> _cloneMap(Map<String, dynamic> source) {

@@ -6,55 +6,50 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
-      title: 'REZO',
-      subtitle: 'Votre avenir en un swipe',
+      title: 'Bienvenue sur REZO',
+      subtitle: 'Un accès simple à votre réseau d’opportunités.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Theme.of(context).colorScheme.primaryContainer,
-                  Colors.white,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFFD0D0D0)),
-            ),
-            child: const Column(
-              children: [
-                RezoLogo(height: 88),
-                SizedBox(height: 10),
-                Text(
-                  'Étudiants, lycéens, profils emploi, entreprises et écoles réunis dans un même espace.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                ),
-                SizedBox(height: 12),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _HeroStatChip(label: 'Étudiant'),
-                    _HeroStatChip(label: 'Lycéen'),
-                    _HeroStatChip(label: 'Emploi'),
-                    _HeroStatChip(label: 'Entreprise'),
-                    _HeroStatChip(label: 'École'),
-                  ],
-                ),
-              ],
+          const SizedBox(height: 8),
+          const Center(
+            child: RezoLogo(height: 112, withBackground: false),
+          ),
+          const SizedBox(height: 28),
+          const Text(
+            'Le bon contact, au bon moment.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              height: 1.1,
+              letterSpacing: -0.4,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
+          Text(
+            'Étudiants, lycéens, entreprises et écoles dans une expérience simple, nette et directe.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 28),
+          Container(
+            height: 1,
+            color: const Color(0xFFE6E6E6),
+          ),
+          const SizedBox(height: 28),
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pushNamed(AppRoutes.login);
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Se connecter'),
           ),
           const SizedBox(height: 12),
@@ -66,13 +61,7 @@ class WelcomeScreen extends StatelessWidget {
             },
             child: const Text('Créer un compte'),
           ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pushNamed(AppRoutes.onboarding);
-            },
-            child: const Text('Découvrir REZO'),
-          ),
+
         ],
       ),
     );

@@ -4,6 +4,38 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rezo/features/auth/auth_flow.dart';
 import 'package:rezo/main.dart';
 
+class _FakeAuthServiceWithRecommendations extends FakeAuthService {
+  @override
+  Future<Map<String, dynamic>> fetchRecommendations({
+    bool includeSwiped = false,
+  }) async {
+    return <String, dynamic>{
+      'recommendations': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'offerId': 'offer-1',
+          'score': 92,
+          'reasons': <String>['Stack Flutter alignée'],
+          'offer': <String, dynamic>{
+            'id': 'offer-1',
+            'titre': 'Stage Flutter',
+            'ownerDisplayName': 'Rezo Labs',
+            'location': 'Dakar',
+            'type': 'STAGE',
+            'domaine': 'Informatique',
+            'competencesRequises': <String>['Flutter', 'Dart'],
+            'description': 'Mission mobile Flutter',
+          },
+        },
+      ],
+      'suggestedPack': null,
+      'trace': <String, dynamic>{
+        'hasOpportunityAccess': true,
+        'availableOfferCount': 1,
+      },
+    };
+  }
+}
+
 void main() {
   group('Auth tunnel UX', () {
     testWidgets('welcome screen exposes onboarding and auth CTAs', (
@@ -17,7 +49,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Votre avenir en un swipe'), findsOneWidget);
+      expect(find.text('Le bon contact, au bon moment.'), findsOneWidget);
       expect(find.text('Se connecter'), findsOneWidget);
       expect(find.text('Créer un compte'), findsOneWidget);
     });
@@ -69,7 +101,7 @@ void main() {
 
       expect(await storage.readToken(), equals('fake-jwt-token'));
       expect(find.textContaining('Dashboard'), findsOneWidget);
-      expect(find.textContaining('ETUDIANT'), findsOneWidget);
+      expect(find.textContaining('Étudiant'), findsOneWidget);
     });
 
     testWidgets('session persisted opens dashboard on app launch', (
@@ -230,7 +262,7 @@ void main() {
     ) async {
       await tester.pumpWidget(
         MyApp(
-          authService: FakeAuthService(),
+          authService: _FakeAuthServiceWithRecommendations(),
           tokenStorage: MemoryTokenStorage(),
         ),
       );
@@ -255,13 +287,17 @@ void main() {
       await tester.tap(find.text('Matching'));
       await tester.pumpAndSettle();
 
+      final introCta = find.widgetWithText(FilledButton, "J'ai compris");
+      if (introCta.evaluate().isNotEmpty) {
+        await tester.tap(introCta, warnIfMissed: false);
+        await tester.pumpAndSettle();
+      }
+
       // New swipe-based design: score badge + circular action buttons
       expect(find.textContaining('% compatible'), findsWidgets);
 
-      // Tap the like (favorite) circular action button (last of 2 favorite icons)
-      final likeButtons = find.byIcon(Icons.favorite_rounded);
-      expect(likeButtons, findsWidgets);
-      await tester.tap(likeButtons.last);
+      // Swipe right on the card to like the current suggestion
+      await tester.drag(find.text('Stage Flutter'), const Offset(180, 0));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Ajout\u00e9 \u00e0 tes favoris'), findsOneWidget);

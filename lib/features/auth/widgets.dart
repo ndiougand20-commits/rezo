@@ -100,15 +100,23 @@ class AuthScaffold extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.child,
+    this.showBackButton = true,
+    this.centerHeaderText = false,
+    this.headerTopSpacing = 6,
+    this.bodyTopSpacing = 16,
   });
 
   final String title;
   final String subtitle;
   final Widget child;
+  final bool showBackButton;
+  final bool centerHeaderText;
+  final double headerTopSpacing;
+  final double bodyTopSpacing;
 
   @override
   Widget build(BuildContext context) {
-    final canPop = Navigator.of(context).canPop();
+    final canPop = showBackButton && Navigator.of(context).canPop();
 
     return Scaffold(
       body: Stack(
@@ -172,7 +180,7 @@ class AuthScaffold extends StatelessWidget {
                       )
                     else
                       const SizedBox(height: 8),
-                    const SizedBox(height: 6),
+                    SizedBox(height: headerTopSpacing),
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -181,19 +189,30 @@ class AuthScaffold extends StatelessWidget {
                         border: Border.all(color: const Color(0xFFE0E0E0)),
                       ),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: centerHeaderText
+                            ? CrossAxisAlignment.center
+                            : CrossAxisAlignment.start,
                         children: [
                           Text(
                             title,
+                            textAlign: centerHeaderText
+                                ? TextAlign.center
+                                : TextAlign.start,
                             style: Theme.of(context).textTheme.headlineMedium
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          Text(subtitle, style: const TextStyle(height: 1.35)),
+                          Text(
+                            subtitle,
+                            textAlign: centerHeaderText
+                                ? TextAlign.center
+                                : TextAlign.start,
+                            style: const TextStyle(height: 1.35),
+                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: bodyTopSpacing),
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(20),
@@ -232,28 +251,6 @@ class _AuthSectionTitle extends StatelessWidget {
           style: TextStyle(color: Colors.grey.shade700, height: 1.3),
         ),
       ],
-    );
-  }
-}
-
-class _HeroStatChip extends StatelessWidget {
-  const _HeroStatChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFE1E9FF)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-      ),
     );
   }
 }
@@ -428,6 +425,243 @@ class _TagPill extends StatelessWidget {
         border: Border.all(color: const Color(0xFFD0D0D0)),
       ),
       child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+/// Construit une vue profil cohérente même si le backend renvoie des noms de
+/// champs différents selon les rôles / versions de payload.
+Map<String, dynamic> resolveUserProfile(Map<String, dynamic> user) {
+  final merged = <String, dynamic>{};
+
+  void mergeCandidate(dynamic candidate) {
+    if (candidate is! Map) return;
+    final map = candidate.cast<String, dynamic>();
+    map.forEach((key, value) {
+      if (!_hasValue(merged[key]) && _hasValue(value)) {
+        merged[key] = value;
+      }
+    });
+  }
+
+  mergeCandidate(user['profil']);
+  mergeCandidate(user['profile']);
+  mergeCandidate(user['profileData']);
+  mergeCandidate(user['detailsProfil']);
+
+  for (final key in const [
+    'niveauEtude',
+    'domaine',
+    'competences',
+    'objectif',
+    'experiences',
+    'preferencesSecteur',
+    'preferencesLieu',
+    'classeActuelle',
+    'orientationSouhaitee',
+    'serieOrientation',
+    'objectifPostbac',
+    'centresInteret',
+    'secteurActivite',
+    'taille',
+    'description',
+    'siteWeb',
+    'adresse',
+    'nomEtablissement',
+    'domaines',
+    'diplomesDelivres',
+    'nomEcole',
+    'filieres',
+    'diplomes',
+    'secteurEntreprise',
+    'tailleEntreprise',
+    'besoinsRecrutement',
+    'descriptionEntreprise',
+  ]) {
+    if (!_hasValue(merged[key]) && _hasValue(user[key])) {
+      merged[key] = user[key];
+    }
+  }
+
+  void alias(String canonical, List<String> aliases) {
+    if (_hasValue(merged[canonical])) return;
+    for (final key in aliases) {
+      if (_hasValue(merged[key])) {
+        merged[canonical] = merged[key];
+        return;
+      }
+    }
+  }
+
+  alias('orientationSouhaitee', const ['serieOrientation']);
+  alias('secteurActivite', const ['domaine']);
+  alias('secteurEntreprise', const ['secteurActivite']);
+  alias('tailleEntreprise', const ['taille']);
+  alias('descriptionEntreprise', const ['description']);
+  alias('nomEcole', const ['nomEtablissement']);
+  alias('filieres', const ['domaines']);
+  alias('diplomes', const ['diplomesDelivres']);
+  alias('besoinsRecrutement', const ['besoins', 'description']);
+
+  return merged;
+}
+
+bool _hasValue(dynamic value) {
+  if (value == null) return false;
+  if (value is String) return value.trim().isNotEmpty;
+  if (value is List || value is Map) return value.isNotEmpty;
+  return true;
+}
+
+// === Helpers globaux (G12) ============================================
+
+/// Helper unifié pour gérer les erreurs d'authentification (401) et réseau.
+/// - 401 : déconnecte et renvoie vers la page d'accueil.
+/// - "Pas de connexion internet" : SnackBar rouge.
+/// - Autres : SnackBar avec le message d'erreur.
+void handleAuthError(BuildContext context, AuthException e) {
+  if (!context.mounted) return;
+  if (e.statusCode == 401) {
+    final appState = AppScope.of(context);
+    unawaited(appState.logout());
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      AppRoutes.welcome,
+      (route) => false,
+    );
+    return;
+  }
+  final isNetwork = e.message.toLowerCase().contains('connexion');
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(e.message),
+      backgroundColor: isNetwork ? Colors.red.shade700 : null,
+    ),
+  );
+}
+
+/// Formatte une date en français court : "12 mars 2025".
+String formatDate(DateTime date, {bool withTime = false}) {
+  const mois = [
+    'janv.',
+    'févr.',
+    'mars',
+    'avr.',
+    'mai',
+    'juin',
+    'juil.',
+    'août',
+    'sept.',
+    'oct.',
+    'nov.',
+    'déc.',
+  ];
+  final m = mois[(date.month - 1).clamp(0, 11)];
+  final base = '${date.day} $m ${date.year}';
+  if (!withTime) return base;
+  final hh = date.hour.toString().padLeft(2, '0');
+  final mm = date.minute.toString().padLeft(2, '0');
+  return '$base, $hh:$mm';
+}
+
+/// Formatte une date relative ("il y a 5 min", "hier", "12 mars").
+String formatRelativeDate(DateTime date) {
+  final now = DateTime.now();
+  final diff = now.difference(date);
+  if (diff.inSeconds < 60) return "à l'instant";
+  if (diff.inMinutes < 60) return 'il y a ${diff.inMinutes} min';
+  if (diff.inHours < 24) return 'il y a ${diff.inHours} h';
+  if (diff.inDays == 1) return 'hier';
+  if (diff.inDays < 7) return 'il y a ${diff.inDays} j';
+  return formatDate(date);
+}
+
+/// Skeleton loader léger (sans dépendre de la lib `shimmer`).
+class SkeletonBox extends StatefulWidget {
+  const SkeletonBox({
+    super.key,
+    this.width,
+    this.height = 16,
+    this.borderRadius = 6,
+  });
+
+  final double? width;
+  final double height;
+  final double borderRadius;
+
+  @override
+  State<SkeletonBox> createState() => _SkeletonBoxState();
+}
+
+class _SkeletonBoxState extends State<SkeletonBox>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, _) {
+        final t = _ctrl.value;
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            color: Color.lerp(
+              const Color(0xFFEDEDED),
+              const Color(0xFFDDDDDD),
+              t,
+            ),
+            borderRadius: BorderRadius.circular(widget.borderRadius),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class SkeletonList extends StatelessWidget {
+  const SkeletonList({super.key, this.itemCount = 5});
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: itemCount,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (_, _) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE0E0E0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            SkeletonBox(width: 180, height: 14),
+            SizedBox(height: 8),
+            SkeletonBox(width: double.infinity, height: 12),
+            SizedBox(height: 6),
+            SkeletonBox(width: 220, height: 12),
+          ],
+        ),
+      ),
     );
   }
 }

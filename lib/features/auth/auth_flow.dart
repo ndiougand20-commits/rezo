@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:video_player/video_player.dart';
 
 part 'services.dart';
 part 'state.dart';
@@ -20,6 +22,8 @@ part 'matches_tab.dart';
 part 'home_tab.dart';
 part 'messages_tab.dart';
 part 'profile_tab.dart';
+part 'offers_tab.dart';
+part 'ai_chat_tab.dart';
 part 'widgets.dart';
 part 'validators.dart';
 part 'fake_auth_service.dart';
@@ -43,7 +47,7 @@ class AuthException implements Exception {
   String toString() => message;
 }
 
-enum UserRole { etudiant, lyceen, emploi, entreprise, ecole }
+enum UserRole { etudiant, lyceen, entreprise, ecole }
 
 extension UserRoleX on UserRole {
   String get apiValue {
@@ -52,8 +56,6 @@ extension UserRoleX on UserRole {
         return 'ETUDIANT';
       case UserRole.lyceen:
         return 'LYCEEN';
-      case UserRole.emploi:
-        return 'EMPLOI';
       case UserRole.entreprise:
         return 'ENTREPRISE';
       case UserRole.ecole:
@@ -67,8 +69,6 @@ extension UserRoleX on UserRole {
         return 'Étudiant';
       case UserRole.lyceen:
         return 'Lycéen';
-      case UserRole.emploi:
-        return 'Emploi';
       case UserRole.entreprise:
         return 'Entreprise';
       case UserRole.ecole:
@@ -82,8 +82,6 @@ extension UserRoleX on UserRole {
         return 'Trouve un stage, une alternance ou un premier emploi pertinent.';
       case UserRole.lyceen:
         return 'Découvre les écoles et formations adaptées à ton projet post-bac.';
-      case UserRole.emploi:
-        return 'Accède à des opportunités ciblées selon ton expérience et ton objectif.';
       case UserRole.entreprise:
         return 'Identifie plus vite les profils compatibles avec tes besoins de recrutement.';
       case UserRole.ecole:
@@ -97,8 +95,6 @@ extension UserRoleX on UserRole {
         return Icons.school_rounded;
       case UserRole.lyceen:
         return Icons.auto_stories_rounded;
-      case UserRole.emploi:
-        return Icons.work_rounded;
       case UserRole.entreprise:
         return Icons.apartment_rounded;
       case UserRole.ecole:
@@ -111,8 +107,6 @@ UserRole parseUserRole(String? value) {
   switch ((value ?? '').trim().toUpperCase()) {
     case 'LYCEEN':
       return UserRole.lyceen;
-    case 'EMPLOI':
-      return UserRole.emploi;
     case 'ENTREPRISE':
       return UserRole.entreprise;
     case 'ECOLE':

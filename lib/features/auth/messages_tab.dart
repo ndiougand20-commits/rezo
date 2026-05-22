@@ -8,16 +8,71 @@ class _MessagesTab extends StatefulWidget {
 }
 
 class _MessagesTabState extends State<_MessagesTab> {
-  List<Map<String, dynamic>>? _conversations;
+  List<_Conversation>? _conversations;
+  Set<String> _matchedUserIds = <String>{};
   bool _isLoading = true;
   String? _error;
-  int? _selectedIndex;
+  _Conversation? _selected;
+  bool? _messagingAllowed;
+  String? _messagingDeniedReason;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_conversations == null && _isLoading) {
-      _loadConversations();
+      _bootstrap();
+    }
+  }
+
+  Future<void> _bootstrap() async {
+    await _checkAccess();
+    if (!mounted) return;
+    if (_messagingAllowed == false) {
+      setState(() => _isLoading = false);
+      return;
+    }
+    await _loadMutualMatches();
+    if (!mounted) return;
+    await _loadConversations();
+  }
+
+  Future<void> _loadMutualMatches() async {
+    try {
+      final appState = AppScope.of(context);
+      final mutual = await appState.fetchMutualMatches();
+      final ids = <String>{};
+      for (final entry in mutual) {
+        final id = entry['otherUserId']?.toString() ??
+            entry['userId']?.toString() ??
+            '';
+        if (id.isNotEmpty) {
+          ids.add(id);
+        }
+      }
+      if (!mounted) return;
+      setState(() => _matchedUserIds = ids);
+    } catch (_) {
+      // En cas d'erreur API, on garde une liste vide (aucune conversation visible).
+      if (!mounted) return;
+      setState(() => _matchedUserIds = <String>{});
+    }
+  }
+
+  Future<void> _checkAccess() async {
+    try {
+      final appState = AppScope.of(context);
+      final access = await appState.getFeatureAccess();
+      final messaging = (access['messaging'] as Map?)?.cast<String, dynamic>();
+      if (!mounted) return;
+      setState(() {
+        _messagingAllowed = messaging?['allowed'] != false;
+        _messagingDeniedReason = messaging?['reason']?.toString();
+      });
+    } catch (_) {
+      // Si l'API d'accès échoue, on considère que la messagerie est ouverte
+      // (le backend enforcera de toutes façons les permissions).
+      if (!mounted) return;
+      setState(() => _messagingAllowed = true);
     }
   }
 
@@ -28,9 +83,14 @@ class _MessagesTabState extends State<_MessagesTab> {
     });
     try {
       final appState = AppScope.of(context);
+      final myId = appState.currentUser?['id']?.toString() ?? '';
       final rawMessages = await appState.fetchMessages();
+      final grouped = _groupByInterlocutor(rawMessages, myId)
+          .where((conv) => _matchedUserIds.contains(conv.otherUserId))
+          .toList();
+      if (!mounted) return;
       setState(() {
-        _conversations = rawMessages;
+        _conversations = grouped;
         _isLoading = false;
       });
     } on AuthException catch (e) {
@@ -44,22 +104,81 @@ class _MessagesTabState extends State<_MessagesTab> {
         );
         return;
       }
+      if (!mounted) return;
       setState(() {
         _error = e.message;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = 'Impossible de charger les messages';
         _isLoading = false;
       });
     }
+  }
+
+  List<_Conversation> _groupByInterlocutor(
+    List<Map<String, dynamic>> messages,
+    String myId,
+  ) {
+    final byOther = <String, List<Map<String, dynamic>>>{};
+    final namesByOther = <String, String>{};
+    for (final m in messages) {
+      final senderId = m['senderId']?.toString() ?? '';
+      final receiverId = m['receiverId']?.toString() ?? '';
+      final isFromMe = senderId == myId;
+      final otherId = isFromMe ? receiverId : senderId;
+      if (otherId.isEmpty) continue;
+      final otherName = isFromMe
+          ? (m['receiverName']?.toString() ?? 'Contact')
+          : (m['senderName']?.toString() ?? 'Contact');
+      byOther.putIfAbsent(otherId, () => <Map<String, dynamic>>[]).add(m);
+      namesByOther.putIfAbsent(otherId, () => otherName);
+    }
+    final convs = <_Conversation>[];
+    for (final entry in byOther.entries) {
+      final list = [...entry.value]..sort((a, b) {
+          final da = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+          final db = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+          return db.compareTo(da);
+        });
+      final last = list.first;
+      final unread = list.where((m) {
+        final senderId = m['senderId']?.toString() ?? '';
+        final isFromMe = senderId == myId;
+        return !isFromMe && m['read'] != true && m['isRead'] != true;
+      }).length;
+      convs.add(_Conversation(
+        otherUserId: entry.key,
+        otherName: namesByOther[entry.key] ?? 'Contact',
+        lastMessage: last['content']?.toString() ?? '',
+        lastDate: last['createdAt']?.toString() ?? '',
+        unreadCount: unread,
+        lastIsFromMe: (last['senderId']?.toString() ?? '') == myId,
+        isMatch: _matchedUserIds.contains(entry.key),
+      ));
+    }
+    convs.sort((a, b) {
+      final da = DateTime.tryParse(a.lastDate) ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final db = DateTime.tryParse(b.lastDate) ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      return db.compareTo(da);
+    });
+    return convs;
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_messagingAllowed == false) {
+      return _buildMessagingDenied();
     }
 
     if (_error != null) {
@@ -77,7 +196,7 @@ class _MessagesTabState extends State<_MessagesTab> {
               OutlinedButton.icon(
                 onPressed: _loadConversations,
                 icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Réessayer'),
+                label: const Text('R\u00e9essayer'),
               ),
             ],
           ),
@@ -85,12 +204,13 @@ class _MessagesTabState extends State<_MessagesTab> {
       );
     }
 
-    final conversations = _conversations ?? const [];
+    final conversations = _conversations ?? const <_Conversation>[];
 
-    if (_selectedIndex != null && _selectedIndex! < conversations.length) {
+    if (_selected != null) {
       return _ConversationDetailView(
-        conversation: conversations[_selectedIndex!],
-        onBack: () => setState(() => _selectedIndex = null),
+        conversation: _selected!,
+        onBack: () => setState(() => _selected = null),
+        onChanged: _loadConversations,
       );
     }
 
@@ -103,7 +223,7 @@ class _MessagesTabState extends State<_MessagesTab> {
             _FeaturePlaceholderCard(
               title: 'Messagerie REZO',
               subtitle:
-                  'Tes conversations apparaîtront ici dès le premier match.',
+                  'Tes conversations appara\u00eetront ici d\u00e8s le premier match.',
               icon: Icons.forum_rounded,
               accent: Color(0xFFE8F0FF),
             ),
@@ -120,19 +240,60 @@ class _MessagesTabState extends State<_MessagesTab> {
         separatorBuilder: (_, _) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final conv = conversations[index];
-          final content = conv['content']?.toString() ?? '';
-          final createdAt = conv['createdAt']?.toString() ?? '';
-          final senderName = conv['senderName']?.toString() ?? 'REZO';
-          final isRead = conv['read'] == true;
-
+          final preview = conv.lastIsFromMe
+              ? 'Vous : ${conv.lastMessage}'
+              : conv.lastMessage;
+          final truncated =
+              preview.length > 60 ? '${preview.substring(0, 60)}\u2026' : preview;
           return _ConversationTile(
-            senderName: senderName,
-            lastMessage: content,
-            date: _formatMessageDate(createdAt),
-            isRead: isRead,
-            onTap: () => setState(() => _selectedIndex = index),
+            senderName: conv.otherName,
+            lastMessage: truncated,
+            date: _formatMessageDate(conv.lastDate),
+            unreadCount: conv.unreadCount,
+            isMatch: conv.isMatch,
+            onTap: () => setState(() => _selected = conv),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildMessagingDenied() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.lock_outline_rounded, size: 56),
+            const SizedBox(height: 16),
+            const Text(
+              'Messagerie non disponible',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              _messagingDeniedReason ??
+                  "Votre pack actuel ne permet pas d'utiliser la messagerie.",
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.black54),
+            ),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: () {
+                final shell = context
+                    .findAncestorStateOfType<_DashboardScreenState>();
+                shell?.goToProfile();
+              },
+              icon: const Icon(Icons.workspace_premium_rounded),
+              label: const Text('Voir les packs'),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -142,6 +303,7 @@ class _MessagesTabState extends State<_MessagesTab> {
     if (parsed == null) return raw;
     final now = DateTime.now();
     final diff = now.difference(parsed);
+    if (diff.inMinutes < 1) return "\u00e0 l'instant";
     if (diff.inMinutes < 60) return '${diff.inMinutes} min';
     if (diff.inHours < 24) return '${diff.inHours}h';
     if (diff.inDays < 7) return '${diff.inDays}j';
@@ -149,23 +311,46 @@ class _MessagesTabState extends State<_MessagesTab> {
   }
 }
 
+class _Conversation {
+  const _Conversation({
+    required this.otherUserId,
+    required this.otherName,
+    required this.lastMessage,
+    required this.lastDate,
+    required this.unreadCount,
+    required this.lastIsFromMe,
+    required this.isMatch,
+  });
+
+  final String otherUserId;
+  final String otherName;
+  final String lastMessage;
+  final String lastDate;
+  final int unreadCount;
+  final bool lastIsFromMe;
+  final bool isMatch;
+}
+
 class _ConversationTile extends StatelessWidget {
   const _ConversationTile({
     required this.senderName,
     required this.lastMessage,
     required this.date,
-    required this.isRead,
+    required this.unreadCount,
+    required this.isMatch,
     required this.onTap,
   });
 
   final String senderName;
   final String lastMessage;
   final String date;
-  final bool isRead;
+  final int unreadCount;
+  final bool isMatch;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final isUnread = unreadCount > 0;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       leading: CircleAvatar(
@@ -181,7 +366,7 @@ class _ConversationTile extends StatelessWidget {
       title: Text(
         senderName,
         style: TextStyle(
-          fontWeight: isRead ? FontWeight.w400 : FontWeight.w700,
+          fontWeight: isUnread ? FontWeight.w800 : FontWeight.w500,
         ),
       ),
       subtitle: Text(
@@ -193,15 +378,40 @@ class _ConversationTile extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          if (isMatch)
+            Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF81C784)),
+              ),
+              child: const Text(
+                'Match',
+                style: TextStyle(
+                  color: Color(0xFF2E7D32),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           Text(date, style: const TextStyle(fontSize: 12)),
-          if (!isRead) ...[
+          if (isUnread) ...[
             const SizedBox(height: 4),
             Container(
-              width: 10,
-              height: 10,
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primary,
-                shape: BoxShape.circle,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$unreadCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],
@@ -212,21 +422,159 @@ class _ConversationTile extends StatelessWidget {
   }
 }
 
-class _ConversationDetailView extends StatelessWidget {
+class _ConversationDetailView extends StatefulWidget {
   const _ConversationDetailView({
     required this.conversation,
     required this.onBack,
+    required this.onChanged,
   });
 
-  final Map<String, dynamic> conversation;
+  final _Conversation conversation;
   final VoidCallback onBack;
+  final VoidCallback onChanged;
+
+  @override
+  State<_ConversationDetailView> createState() =>
+      _ConversationDetailViewState();
+}
+
+class _ConversationDetailViewState extends State<_ConversationDetailView> {
+  List<Map<String, dynamic>> _messages = const <Map<String, dynamic>>[];
+  bool _isLoading = true;
+  String? _error;
+  bool _isSending = false;
+  final TextEditingController _composer = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadMessages();
+    });
+  }
+
+  @override
+  void dispose() {
+    _composer.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadMessages() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final appState = AppScope.of(context);
+      final myId = appState.currentUser?['id']?.toString() ?? '';
+      final messages =
+          await appState.getConversation(widget.conversation.otherUserId);
+      messages.sort((a, b) {
+        final da = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final db = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return da.compareTo(db);
+      });
+      if (!mounted) return;
+      setState(() {
+        _messages = messages;
+        _isLoading = false;
+      });
+      _scrollToBottom();
+      // Marquer comme lu en arrière-plan
+      for (final m in messages) {
+        final senderId = m['senderId']?.toString() ?? '';
+        final isUnread = m['read'] != true && m['isRead'] != true;
+        if (isUnread && senderId != myId) {
+          final id = m['id']?.toString();
+          if (id == null) continue;
+          unawaited(appState
+              .markMessageRead(id)
+              .catchError((Object _) => <String, dynamic>{}));
+        }
+      }
+      widget.onChanged();
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Impossible de charger la conversation';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  Future<void> _sendMessage() async {
+    final text = _composer.text.trim();
+    if (text.isEmpty || _isSending) return;
+    setState(() => _isSending = true);
+    try {
+      final appState = AppScope.of(context);
+      await appState.sendMessage(
+        receiverId: widget.conversation.otherUserId,
+        content: text,
+      );
+      _composer.clear();
+      await _loadMessages();
+      widget.onChanged();
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      if (e.statusCode == 403) {
+        final lower = e.message.toLowerCase();
+        if (lower.contains('joignable') ||
+            lower.contains('destinataire')) {
+          messenger.showSnackBar(SnackBar(content: Text(e.message)));
+        } else {
+          messenger.showSnackBar(SnackBar(
+            content: const Text(
+                'Votre pack ne permet pas d\u2019envoyer des messages.'),
+            action: SnackBarAction(
+              label: 'Upgrade',
+              onPressed: () {
+                final shell = context
+                    .findAncestorStateOfType<_DashboardScreenState>();
+                shell?.goToProfile();
+              },
+            ),
+          ));
+        }
+      } else {
+        messenger.showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Envoi impossible. R\u00e9essaie.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final content = conversation['content']?.toString() ?? '';
-    final senderName = conversation['senderName']?.toString() ?? 'REZO';
-    final createdAt = conversation['createdAt']?.toString() ?? '';
-
+    final myId =
+        AppScope.of(context).currentUser?['id']?.toString() ?? '';
     return Column(
       children: [
         Container(
@@ -239,7 +587,7 @@ class _ConversationDetailView extends StatelessWidget {
           child: Row(
             children: [
               IconButton(
-                onPressed: onBack,
+                onPressed: widget.onBack,
                 icon: const Icon(Icons.arrow_back_rounded),
               ),
               const SizedBox(width: 8),
@@ -247,7 +595,9 @@ class _ConversationDetailView extends StatelessWidget {
                 radius: 18,
                 backgroundColor: const Color(0xFFF0F0F0),
                 child: Text(
-                  senderName.isNotEmpty ? senderName[0].toUpperCase() : '?',
+                  widget.conversation.otherName.isNotEmpty
+                      ? widget.conversation.otherName[0].toUpperCase()
+                      : '?',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     color: Theme.of(context).colorScheme.primary,
@@ -257,7 +607,7 @@ class _ConversationDetailView extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  senderName,
+                  widget.conversation.otherName,
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
@@ -268,24 +618,44 @@ class _ConversationDetailView extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _MessageBubble(
-                text: content,
-                time: createdAt,
-                isMe: false,
-              ),
-              const SizedBox(height: 24),
-              const _FeaturePlaceholderCard(
-                title: 'Réponses à venir',
-                subtitle:
-                    'La saisie de messages sera activée à la connexion du backend.',
-                icon: Icons.edit_rounded,
-                accent: Color(0xFFE8F0FF),
-              ),
-            ],
-          ),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.error_outline_rounded,
+                                size: 40),
+                            const SizedBox(height: 8),
+                            Text(_error!, textAlign: TextAlign.center),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              onPressed: _loadMessages,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('R\u00e9essayer'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, i) {
+                        final m = _messages[i];
+                        final isMe =
+                            (m['senderId']?.toString() ?? '') == myId;
+                        return _MessageBubble(
+                          text: m['content']?.toString() ?? '',
+                          time: m['createdAt']?.toString() ?? '',
+                          isMe: isMe,
+                        );
+                      },
+                    ),
         ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -299,9 +669,14 @@ class _ConversationDetailView extends StatelessWidget {
             children: [
               Expanded(
                 child: TextField(
-                  enabled: false,
+                  controller: _composer,
+                  enabled: !_isSending,
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _sendMessage(),
                   decoration: InputDecoration(
-                    hintText: 'Écrire un message…',
+                    hintText: '\u00c9crire un message\u2026',
                     filled: true,
                     fillColor: const Color(0xFFF5F5F5),
                     border: OutlineInputBorder(
@@ -317,11 +692,17 @@ class _ConversationDetailView extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               IconButton(
-                onPressed: null,
-                icon: Icon(
-                  Icons.send_rounded,
-                  color: Theme.of(context).disabledColor,
-                ),
+                onPressed: _isSending ? null : _sendMessage,
+                icon: _isSending
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        Icons.send_rounded,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
               ),
             ],
           ),

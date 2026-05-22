@@ -69,25 +69,48 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return AuthScaffold(
       title: 'Connexion',
-      subtitle: 'Récupère ton espace REZO en toute sécurité.',
+      subtitle: 'Accède à ton espace en quelques secondes.',
+      showBackButton: false,
+      centerHeaderText: true,
+      headerTopSpacing: 40,
+      bodyTopSpacing: 44,
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const _AuthSectionTitle(
-              title: 'Connexion rapide',
-              subtitle:
-                  'Entre ton email et ton mot de passe pour retrouver ton espace.',
+            const Center(
+              child: RezoLogo(height: 72, withBackground: false),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
+            const Text(
+              'Content de te revoir.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                height: 1.1,
+                letterSpacing: -0.4,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Entre ton email et ton mot de passe pour continuer',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 13,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 14),
             if (_errorMessage != null) ...[
               _InfoBanner(
                 message: _errorMessage!,
                 color: Colors.red.shade50,
                 textColor: Colors.red.shade800,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
             ],
             TextFormField(
               controller: _emailController,
@@ -98,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               validator: _validateEmail,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _passwordController,
               obscureText: true,
@@ -108,22 +131,31 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               validator: _validatePassword,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             ElevatedButton(
               onPressed: _loading ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+              ),
               child: _loading
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text('Connexion'),
             ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pushReplacementNamed(AppRoutes.signup);
-              },
+            const SizedBox(height: 10),
+            OutlinedButton(
+              onPressed: _loading
+                  ? null
+                  : () {
+                      Navigator.of(context).pushReplacementNamed(AppRoutes.signup);
+                    },
               child: const Text('Créer un compte'),
             ),
           ],

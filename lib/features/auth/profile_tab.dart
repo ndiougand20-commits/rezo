@@ -18,6 +18,8 @@ class _ProfileTabState extends State<_ProfileTab> {
   List<Map<String, dynamic>> _messages = const [];
   List<Map<String, dynamic>> _offers = const [];
   List<Map<String, dynamic>> _mediaFiles = const [];
+  Map<String, dynamic>? _ownSchool;
+  Map<String, dynamic>? _ownCompany;
   bool _loadedOnce = false;
 
   @override
@@ -52,6 +54,38 @@ class _ProfileTabState extends State<_ProfileTab> {
         _offers = results[2];
         _mediaFiles = results[3];
       });
+
+      // Chargement conditionnel de la fiche école / entreprise selon le rôle
+      final role = parseUserRole(
+          (appState.currentUser?['role'] as String?));
+      final myId = appState.currentUser?['id']?.toString();
+      if (myId != null) {
+        try {
+          if (role == UserRole.ecole) {
+            final schools = await appState.listSchools();
+            if (!mounted) return;
+            setState(() {
+              _ownSchool = schools.firstWhere(
+                (s) => s['ownerUserId']?.toString() == myId,
+                orElse: () => <String, dynamic>{},
+              );
+              if (_ownSchool!.isEmpty) _ownSchool = null;
+            });
+          } else if (role == UserRole.entreprise) {
+            final companies = await appState.listCompanies();
+            if (!mounted) return;
+            setState(() {
+              _ownCompany = companies.firstWhere(
+                (c) => c['ownerUserId']?.toString() == myId,
+                orElse: () => <String, dynamic>{},
+              );
+              if (_ownCompany!.isEmpty) _ownCompany = null;
+            });
+          }
+        } catch (_) {
+          // Échec silencieux : la section affichera l'option de création.
+        }
+      }
     } on AuthException catch (error) {
       if (!mounted) return;
       setState(() => _error = error.message);
@@ -108,6 +142,21 @@ class _ProfileTabState extends State<_ProfileTab> {
       return;
     }
 
+    final appState = AppScope.of(context);
+    final userRole =
+        (appState.currentUser?['role']?.toString() ?? '').toUpperCase();
+    final filtered = _packs.where((pack) {
+      final cible = pack['cible'];
+      if (cible == null) return true;
+      if (cible is List) {
+        if (cible.isEmpty) return true;
+        return cible.any((c) => c.toString().toUpperCase() == userRole);
+      }
+      final s = cible.toString().toUpperCase();
+      if (s.isEmpty || s == 'ALL' || s == 'TOUS') return true;
+      return s.contains(userRole);
+    }).toList();
+
     final selectedPackId = await showModalBottomSheet<String>(
       context: context,
       useSafeArea: true,
@@ -120,26 +169,45 @@ class _ProfileTabState extends State<_ProfileTab> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 10),
-            ..._packs.map((pack) {
-              final id = pack['id']?.toString() ?? pack['packId']?.toString();
-              if (id == null) {
-                return const SizedBox.shrink();
-              }
-              return Card(
-                child: ListTile(
-                  title: Text(
-                    pack['nom']?.toString() ??
-                        pack['name']?.toString() ??
-                        'Pack',
+            if (filtered.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                    child: Text('Aucun pack disponible pour ton profil')),
+              )
+            else
+              ...filtered.map((pack) {
+                final id = pack['id']?.toString() ?? pack['packId']?.toString();
+                if (id == null) {
+                  return const SizedBox.shrink();
+                }
+                final prix = pack['prix'];
+                final priceLabel = prix == null
+                    ? 'Gratuit'
+                    : '${prix.toString()} FCFA / mois';
+                return Card(
+                  child: ListTile(
+                    title: Text(
+                      pack['nom']?.toString() ??
+                          pack['name']?.toString() ??
+                          'Pack',
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(priceLabel,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700)),
+                        if ((pack['description']?.toString() ?? '')
+                            .isNotEmpty)
+                          Text(pack['description'].toString()),
+                      ],
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.of(context).pop(id),
                   ),
-                  subtitle: Text(
-                    pack['description']?.toString() ?? 'Sélectionner ce pack',
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => Navigator.of(context).pop(id),
-                ),
-              );
-            }),
+                );
+              }),
           ],
         );
       },
@@ -230,9 +298,15 @@ class _ProfileTabState extends State<_ProfileTab> {
     }
   }
 
-  Future<void> _uploadJustificatif() async {
+  Future<void> _uploadCategoryPdf({
+    required String category,
+    required String successLabel,
+    bool multiUpload = false,
+    bool replaceExisting = false,
+  }) async {
     final picked = await FilePicker.platform.pickFiles(
       withData: true,
+      allowMultiple: multiUpload,
       type: FileType.custom,
       allowedExtensions: const ['pdf'],
     );
@@ -244,40 +318,59 @@ class _ProfileTabState extends State<_ProfileTab> {
       return;
     }
 
-    final file = picked.files.single;
-    final bytes = file.bytes;
-    final fileName = file.name;
     final maxSize = 12 * 1024 * 1024;
-
-    if (bytes == null || bytes.isEmpty) {
-      _showSnack('Impossible de lire le fichier PDF');
-      return;
-    }
-    if (!_isPdf(fileName)) {
-      _showSnack(
-        'Seuls les fichiers PDF sont autorisés pour les justificatifs',
-      );
-      return;
-    }
-    if (bytes.length > maxSize) {
-      _showSnack('Le PDF dépasse la taille maximale autorisée (12MB)');
-      return;
+    final files = picked.files;
+    for (final file in files) {
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        _showSnack('Impossible de lire le fichier PDF');
+        return;
+      }
+      if (!_isPdf(file.name)) {
+        _showSnack('Seuls les fichiers PDF sont autorisés');
+        return;
+      }
+      if (bytes.length > maxSize) {
+        _showSnack('Le PDF dépasse la taille maximale autorisée (12MB)');
+        return;
+      }
     }
 
     setState(() => _saving = true);
     try {
-      await AppScope.of(
-        context,
-      ).uploadJustificatifPdf(bytes: bytes, fileName: fileName);
+      final appState = AppScope.of(context);
+      if (replaceExisting) {
+        final existing = _mediaFiles
+            .where((entry) =>
+                entry['category']?.toString().toUpperCase() == category)
+            .toList();
+        for (final media in existing) {
+          final id = media['id']?.toString();
+          if (id != null && id.isNotEmpty) {
+            await appState.deleteMyMedia(id);
+          }
+        }
+      }
+
+      for (final file in files) {
+        final bytes = file.bytes;
+        if (bytes == null) continue;
+        await appState.uploadJustificatifPdf(
+          bytes: bytes,
+          fileName: file.name,
+          category: category,
+        );
+      }
+
       await _loadProfileData();
-      _showSnack('Justificatif ajouté');
+      _showSnack(successLabel);
     } on AuthException catch (error) {
       _showSnack(error.message);
       if (error.statusCode == 401) {
         await widget.onLogout();
       }
     } catch (_) {
-      _showSnack('Erreur lors de l\'upload du justificatif');
+      _showSnack('Erreur lors de l\'upload');
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -343,6 +436,26 @@ class _ProfileTabState extends State<_ProfileTab> {
 
   bool _isPdf(String fileName) => fileName.toLowerCase().endsWith('.pdf');
 
+  List<Map<String, dynamic>> _mediaForCategory(String category) {
+    return _mediaFiles
+        .where((entry) =>
+            entry['category']?.toString().toUpperCase() == category)
+        .toList()
+      ..sort((a, b) {
+        final left = a['createdAt']?.toString() ?? '';
+        final right = b['createdAt']?.toString() ?? '';
+        return right.compareTo(left);
+      });
+  }
+
+  String _initials(String value) {
+    final parts = value.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return value.isNotEmpty ? value[0].toUpperCase() : '?';
+  }
+
   String _toAbsoluteMediaUrl(String? fileUrl) {
     final raw = fileUrl?.trim() ?? '';
     if (raw.isEmpty) {
@@ -365,9 +478,7 @@ class _ProfileTabState extends State<_ProfileTab> {
   Widget build(BuildContext context) {
     final appState = AppScope.of(context);
     final user = appState.currentUser ?? const <String, dynamic>{};
-    final profile =
-        (user['profil'] as Map?)?.cast<String, dynamic>() ??
-        const <String, dynamic>{};
+    final profile = resolveUserProfile(user);
 
     final fullName = [
       user['prenom'],
@@ -382,20 +493,11 @@ class _ProfileTabState extends State<_ProfileTab> {
             ?.map((item) => item.toString())
             .toList() ??
         const <String>[];
-    final justificatifs =
-        _mediaFiles
-            .where(
-              (entry) =>
-                  entry['category']?.toString().toUpperCase() ==
-                  'JUSTIFICATIF_PDF',
-            )
-            .toList()
-          ..sort((a, b) {
-            final left = a['createdAt']?.toString() ?? '';
-            final right = b['createdAt']?.toString() ?? '';
-            return right.compareTo(left);
-          });
-
+    final headlineChips = _headlineItemsForRole(role, profile);
+    final objectiveText = _objectiveForRole(role, profile);
+    final showHeadlineSection =
+      headlineChips.isNotEmpty || objectiveText.trim().isNotEmpty;
+    final showPreferencesSection = role == UserRole.etudiant;
     final canManageOffers = user['canManageOffers'] == true;
     final userId = user['id']?.toString();
     final ownedOffers = canManageOffers && userId != null
@@ -428,6 +530,9 @@ class _ProfileTabState extends State<_ProfileTab> {
             email: user['email']?.toString() ?? 'Aucune adresse email',
             roleLabel: role.label,
             packName: packName,
+            initials: _initials(fullName.isEmpty
+                ? (user['email']?.toString() ?? '?')
+                : fullName),
           ),
           const SizedBox(height: 12),
           Row(
@@ -450,57 +555,55 @@ class _ProfileTabState extends State<_ProfileTab> {
             ],
           ),
           const SizedBox(height: 16),
-          _ProfileSectionCard(
-            title: 'Compétences et objectifs',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _ChipWrap(
-                  items:
-                      (profile['competences'] as List?)
-                          ?.map((entry) => entry.toString())
-                          .toList() ??
-                      const [],
-                  emptyLabel: 'Aucune compétence renseignée',
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  profile['objectif']?.toString() ?? 'Aucun objectif défini',
-                ),
-              ],
+          if (showHeadlineSection) ...[
+            _ProfileSectionCard(
+              title: role == UserRole.lyceen
+                  ? 'Centres d’intérêt et projet'
+                  : 'Compétences et objectifs',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _ChipWrap(
+                    items: headlineChips,
+                    emptyLabel: role == UserRole.lyceen
+                        ? 'Aucun centre d’intérêt renseigné'
+                        : 'Aucune compétence renseignée',
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    objectiveText.isNotEmpty
+                        ? objectiveText
+                        : 'Aucun objectif défini',
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          _ProfileSectionCard(
-            title: 'Préférences',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Secteurs'),
-                const SizedBox(height: 6),
-                _ChipWrap(
-                  items:
-                      (profile['preferencesSecteur'] as List?)
-                          ?.map((entry) => entry.toString())
-                          .toList() ??
-                      const [],
-                  emptyLabel: 'Aucune préférence secteur',
-                ),
-                const SizedBox(height: 10),
-                const Text('Lieux'),
-                const SizedBox(height: 6),
-                _ChipWrap(
-                  items:
-                      (profile['preferencesLieu'] as List?)
-                          ?.map((entry) => entry.toString())
-                          .toList() ??
-                      const [],
-                  emptyLabel: 'Aucune préférence lieu',
-                ),
-              ],
+            const SizedBox(height: 12),
+          ],
+          if (showPreferencesSection) ...[
+            _ProfileSectionCard(
+              title: 'Préférences',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Secteurs'),
+                  const SizedBox(height: 6),
+                  _ChipWrap(
+                    items: _asStringList(profile['preferencesSecteur']),
+                    emptyLabel: 'Aucune préférence secteur',
+                  ),
+                  const SizedBox(height: 10),
+                  const Text('Lieux'),
+                  const SizedBox(height: 6),
+                  _ChipWrap(
+                    items: _asStringList(profile['preferencesLieu']),
+                    emptyLabel: 'Aucune préférence lieu',
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
+          ],
           _ProfileSectionCard(
             title: 'Pack actuel',
             child: Column(
@@ -513,6 +616,14 @@ class _ProfileTabState extends State<_ProfileTab> {
                     fontSize: 15,
                   ),
                 ),
+                if ((user['packCible']?.toString() ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Cible : ${user['packCible']}',
+                    style: const TextStyle(
+                        color: Colors.black54, fontSize: 12),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 _ChipWrap(
                   items: packFeatures,
@@ -522,64 +633,73 @@ class _ProfileTabState extends State<_ProfileTab> {
             ),
           ),
           const SizedBox(height: 12),
-          _ProfileSectionCard(
-            title: 'Photo et justificatifs',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _saving ? null : _uploadProfilePhoto,
-                        icon: const Icon(Icons.add_a_photo_rounded),
-                        label: const Text('Photo de profil'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _saving ? null : _uploadJustificatif,
-                        icon: const Icon(Icons.picture_as_pdf_rounded),
-                        label: const Text('Justificatif PDF'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                if (justificatifs.isEmpty)
-                  Text(
-                    'Aucun justificatif ajouté',
-                    style: TextStyle(color: Colors.grey.shade700),
-                  )
-                else
-                  Column(
-                    children: justificatifs.map((media) {
-                      final mediaId = media['id']?.toString();
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.description_rounded),
-                        title: Text(
-                          media['originalFileName']?.toString() ??
-                              'Justificatif',
-                        ),
-                        subtitle: Text(
-                          media['createdAt']?.toString() ?? 'Date inconnue',
-                        ),
-                        trailing: mediaId == null
-                            ? null
-                            : IconButton(
-                                onPressed: _saving
-                                    ? null
-                                    : () => _deleteMedia(mediaId),
-                                icon: const Icon(Icons.delete_outline_rounded),
-                              ),
-                      );
-                    }).toList(),
-                  ),
-              ],
+          if (role == UserRole.etudiant) ...[
+            _buildDocSection(
+              title: 'CV',
+              category: 'CV',
+              multiUpload: false,
+              role: role,
             ),
-          ),
+            const SizedBox(height: 12),
+            _buildDocSection(
+              title: 'Lettre de motivation',
+              category: 'LM',
+              multiUpload: false,
+              role: role,
+            ),
+            const SizedBox(height: 12),
+            _buildDocSection(
+              title: 'Justificatifs de diplômes',
+              category: 'DIPLOME',
+              multiUpload: true,
+              role: role,
+            ),
+          ],
+          if (role == UserRole.lyceen) ...[
+            _buildDocSection(
+              title: 'Bulletins scolaires',
+              category: 'BULLETIN',
+              multiUpload: true,
+              role: role,
+            ),
+            const SizedBox(height: 12),
+            _buildDocSection(
+              title: 'Justificatifs divers',
+              category: 'JUSTIFICATIF_RECONN',
+              multiUpload: true,
+              role: role,
+            ),
+          ],
+          if (role == UserRole.ecole) ...[
+            _buildDocSection(
+              title: 'Justificatifs de reconnaissance',
+              category: 'JUSTIFICATIF_RECONN',
+              multiUpload: true,
+              role: role,
+            ),
+            const SizedBox(height: 12),
+            _buildDocSection(
+              title: 'Photo de l\'établissement',
+              category: 'PHOTO',
+              multiUpload: false,
+              role: role,
+            ),
+          ],
+          if (role == UserRole.entreprise) ...[
+            _buildDocSection(
+              title: 'Justificatifs d\'entreprise',
+              category: 'JUSTIFICATIF_ENTREPRISE',
+              multiUpload: true,
+              role: role,
+            ),
+            const SizedBox(height: 12),
+            _buildDocSection(
+              title: 'Photo / logo entreprise',
+              category: 'PHOTO',
+              multiUpload: false,
+              role: role,
+            ),
+          ],
           const SizedBox(height: 12),
           _ProfileSectionCard(
             title: 'Historique messages',
@@ -608,6 +728,14 @@ class _ProfileTabState extends State<_ProfileTab> {
               ),
             ),
           ],
+          if (role == UserRole.ecole) ...[
+            const SizedBox(height: 12),
+            _buildSchoolSection(),
+          ],
+          if (role == UserRole.entreprise) ...[
+            const SizedBox(height: 12),
+            _buildCompanySection(),
+          ],
           const SizedBox(height: 12),
           ElevatedButton.icon(
             onPressed: _saving
@@ -622,6 +750,315 @@ class _ProfileTabState extends State<_ProfileTab> {
       ),
     );
   }
+
+  Widget _buildSchoolSection() {
+    final school = _ownSchool;
+    if (school == null) {
+      return _ProfileSectionCard(
+        title: 'Ma fiche école',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Aucune fiche école pour le moment. Crée-la pour apparaître dans les recommandations des lycéens.',
+            ),
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              onPressed: _saving ? null : () => _openSchoolSheet(null),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Créer ma fiche école'),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    final domaines = (school['domaines'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        const <String>[];
+    return _ProfileSectionCard(
+      title: 'Ma fiche école',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            school['nomEtablissement']?.toString() ?? 'École',
+            style: const TextStyle(
+                fontWeight: FontWeight.w800, fontSize: 16),
+          ),
+          const SizedBox(height: 4),
+          if ((school['statut']?.toString() ?? '').isNotEmpty)
+            Text('Statut : ${school['statut']}'),
+          if ((school['siteWeb']?.toString() ?? '').isNotEmpty)
+            Text('Site : ${school['siteWeb']}'),
+          if ((school['adresse']?.toString() ?? '').isNotEmpty)
+            Text('Adresse : ${school['adresse']}'),
+          const SizedBox(height: 8),
+          _ChipWrap(items: domaines, emptyLabel: 'Aucun domaine'),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _saving ? null : () => _openSchoolSheet(school),
+            icon: const Icon(Icons.edit_rounded),
+            label: const Text('Modifier'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDocSection({
+    required String title,
+    required String category,
+    required bool multiUpload,
+    required UserRole role,
+  }) {
+    final entries = _mediaForCategory(category);
+    final isPhoto = category == 'PHOTO';
+    final replaceExisting = !multiUpload;
+    return _ProfileSectionCard(
+      title: title,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _saving
+                      ? null
+                      : () {
+                          if (isPhoto) {
+                            _uploadProfilePhoto();
+                          } else {
+                            _uploadCategoryPdf(
+                              category: category,
+                              successLabel: '$title ajouté',
+                              multiUpload: multiUpload,
+                              replaceExisting: replaceExisting,
+                            );
+                          }
+                        },
+                  icon: Icon(
+                    isPhoto
+                        ? Icons.add_a_photo_rounded
+                        : Icons.picture_as_pdf_rounded,
+                  ),
+                  label: Text(
+                    isPhoto
+                        ? 'Ajouter une photo'
+                        : (multiUpload ? 'Ajouter des PDFs' : 'Ajouter un PDF'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (entries.isEmpty)
+            Text(
+              'Aucun document ajouté',
+              style: TextStyle(color: Colors.grey.shade700),
+            )
+          else
+            Column(
+              children: entries.map((media) {
+                final mediaId = media['id']?.toString();
+                final fileName = media['originalFileName']?.toString() ??
+                    (isPhoto ? 'Photo' : 'Document');
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    isPhoto
+                        ? Icons.image_outlined
+                        : Icons.description_rounded,
+                  ),
+                  title: Text(fileName),
+                  subtitle:
+                      Text(media['createdAt']?.toString() ?? 'Date inconnue'),
+                  trailing: mediaId == null
+                      ? null
+                      : IconButton(
+                          onPressed: _saving ? null : () => _deleteMedia(mediaId),
+                          icon: const Icon(Icons.delete_outline_rounded),
+                        ),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompanySection() {
+    final company = _ownCompany;
+    if (company == null) {
+      return _ProfileSectionCard(
+        title: 'Ma fiche entreprise',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Aucune fiche entreprise pour le moment. Crée-la pour publier des offres et matcher avec des candidats.',
+            ),
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              onPressed: _saving ? null : () => _openCompanySheet(null),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Créer ma fiche entreprise'),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return _ProfileSectionCard(
+      title: 'Ma fiche entreprise',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            company['raisonSociale']?.toString() ?? 'Entreprise',
+            style: const TextStyle(
+                fontWeight: FontWeight.w800, fontSize: 16),
+          ),
+          const SizedBox(height: 4),
+          if ((company['secteurActivite']?.toString() ?? '').isNotEmpty)
+            Text('Secteur : ${company['secteurActivite']}'),
+          if ((company['taille']?.toString() ?? '').isNotEmpty)
+            Text('Taille : ${company['taille']}'),
+          if ((company['siteWeb']?.toString() ?? '').isNotEmpty)
+            Text('Site : ${company['siteWeb']}'),
+          if ((company['adresse']?.toString() ?? '').isNotEmpty)
+            Text('Adresse : ${company['adresse']}'),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _saving ? null : () => _openCompanySheet(company),
+            icon: const Icon(Icons.edit_rounded),
+            label: const Text('Modifier'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openSchoolSheet(Map<String, dynamic>? existing) async {
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => _SchoolFormSheet(initial: existing),
+    );
+    if (result == null) return;
+    if (!mounted) return;
+    setState(() => _saving = true);
+    try {
+      final appState = AppScope.of(context);
+      if (existing == null) {
+        await appState.createSchool(result);
+        _showSnack('Fiche école créée');
+      } else {
+        final id = existing['id']?.toString();
+        if (id == null) throw const FormatException('Identifiant école manquant');
+        await appState.updateSchool(id, result);
+        _showSnack('Fiche école mise à jour');
+      }
+      await _loadProfileData();
+    } on AuthException catch (e) {
+      _showSnack(e.message);
+    } catch (_) {
+      _showSnack('Sauvegarde impossible');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _openCompanySheet(Map<String, dynamic>? existing) async {
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => _CompanyFormSheet(initial: existing),
+    );
+    if (result == null) return;
+    if (!mounted) return;
+    setState(() => _saving = true);
+    try {
+      final appState = AppScope.of(context);
+      if (existing == null) {
+        await appState.createCompany(result);
+        _showSnack('Fiche entreprise créée');
+      } else {
+        final id = existing['id']?.toString();
+        if (id == null) throw const FormatException('Identifiant entreprise manquant');
+        await appState.updateCompany(id, result);
+        _showSnack('Fiche entreprise mise à jour');
+      }
+      await _loadProfileData();
+    } on AuthException catch (e) {
+      _showSnack(e.message);
+    } catch (_) {
+      _showSnack('Sauvegarde impossible');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  List<String> _asStringList(dynamic raw) {
+    if (raw is List) {
+      return raw
+          .map((entry) => entry.toString().trim())
+          .where((entry) => entry.isNotEmpty)
+          .toList();
+    }
+    if (raw is String) {
+      final trimmed = raw.trim();
+      if (trimmed.isEmpty) return const [];
+      if (!trimmed.contains(',')) return [trimmed];
+      return trimmed
+          .split(',')
+          .map((entry) => entry.trim())
+          .where((entry) => entry.isNotEmpty)
+          .toList();
+    }
+    return const [];
+  }
+
+  List<String> _headlineItemsForRole(
+    UserRole role,
+    Map<String, dynamic> profile,
+  ) {
+    switch (role) {
+      case UserRole.lyceen:
+        return _asStringList(profile['centresInteret']);
+      case UserRole.entreprise:
+        return _asStringList(profile['besoinsRecrutement']);
+      case UserRole.ecole:
+        return _asStringList(profile['filieres']);
+      case UserRole.etudiant:
+        return _asStringList(profile['competences']);
+    }
+  }
+
+  String _objectiveForRole(UserRole role, Map<String, dynamic> profile) {
+    switch (role) {
+      case UserRole.lyceen:
+        return profile['objectifPostbac']?.toString().trim() ?? '';
+      case UserRole.entreprise:
+        return profile['descriptionEntreprise']?.toString().trim() ?? '';
+      case UserRole.ecole:
+        return profile['descriptionEcole']?.toString().trim() ??
+            profile['description']?.toString().trim() ??
+            '';
+      case UserRole.etudiant:
+        return profile['objectif']?.toString().trim() ?? '';
+    }
+  }
 }
 
 class _ProfileHeaderCard extends StatelessWidget {
@@ -631,6 +1068,7 @@ class _ProfileHeaderCard extends StatelessWidget {
     required this.email,
     required this.roleLabel,
     required this.packName,
+    required this.initials,
   });
 
   final String? avatarUrl;
@@ -638,9 +1076,11 @@ class _ProfileHeaderCard extends StatelessWidget {
   final String email;
   final String roleLabel;
   final String packName;
+  final String initials;
 
   @override
   Widget build(BuildContext context) {
+    final hasAvatar = avatarUrl != null && avatarUrl!.isNotEmpty;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -657,15 +1097,22 @@ class _ProfileHeaderCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.white,
-            backgroundImage: avatarUrl != null && avatarUrl!.isNotEmpty
-                ? NetworkImage(avatarUrl!)
-                : null,
-            child: avatarUrl == null || avatarUrl!.isEmpty
-                ? const Icon(Icons.person_rounded)
-                : null,
+          ClipOval(
+            child: SizedBox(
+              width: 60,
+              height: 60,
+              child: hasAvatar
+                  ? Image.network(
+                      avatarUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => _avatarFallback(context),
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return _avatarFallback(context);
+                      },
+                    )
+                  : _avatarFallback(context),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -694,6 +1141,21 @@ class _ProfileHeaderCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _avatarFallback(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: Theme.of(context).colorScheme.primary,
+          fontSize: 22,
+        ),
       ),
     );
   }
@@ -789,9 +1251,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   @override
   void initState() {
     super.initState();
-    final profile =
-        (widget.initialUser['profil'] as Map?)?.cast<String, dynamic>() ??
-        const <String, dynamic>{};
+    final profile = resolveUserProfile(widget.initialUser);
 
     _prenomController = TextEditingController(
       text: widget.initialUser['prenom']?.toString() ?? '',
@@ -931,7 +1391,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             ...switch (role) {
               UserRole.etudiant => _buildStudentFields(),
               UserRole.lyceen => _buildHighSchoolFields(),
-              UserRole.emploi => _buildJobFields(),
               UserRole.entreprise => _buildCompanyFields(),
               UserRole.ecole => _buildSchoolFields(),
             },
@@ -1021,53 +1480,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       TextFormField(
         controller: _competencesController,
         decoration: const InputDecoration(labelText: 'Centres d’intérêt (csv)'),
-        validator: _optionalCsvValidator,
-      ),
-    ];
-  }
-
-  List<Widget> _buildJobFields() {
-    return [
-      TextFormField(
-        controller: _niveauController,
-        decoration: const InputDecoration(labelText: 'Niveau d’étude'),
-        validator: (v) => _requiredField(v, 'Le niveau d’étude'),
-      ),
-      const SizedBox(height: 10),
-      TextFormField(
-        controller: _domaineController,
-        decoration: const InputDecoration(labelText: 'Domaine'),
-        validator: (v) => _requiredField(v, 'Le domaine'),
-      ),
-      const SizedBox(height: 10),
-      TextFormField(
-        controller: _competencesController,
-        decoration: const InputDecoration(labelText: 'Compétences (csv)'),
-        validator: _optionalCsvValidator,
-      ),
-      const SizedBox(height: 10),
-      TextFormField(
-        controller: _objectifController,
-        decoration: const InputDecoration(labelText: 'Objectif professionnel'),
-      ),
-      const SizedBox(height: 10),
-      TextFormField(
-        controller: _experiencesController,
-        decoration: const InputDecoration(labelText: 'Expériences (csv)'),
-        validator: _optionalCsvValidator,
-      ),
-      const SizedBox(height: 10),
-      TextFormField(
-        controller: _preferencesSecteurController,
-        decoration: const InputDecoration(
-          labelText: 'Préférences secteur (csv)',
-        ),
-        validator: _optionalCsvValidator,
-      ),
-      const SizedBox(height: 10),
-      TextFormField(
-        controller: _preferencesLieuController,
-        decoration: const InputDecoration(labelText: 'Préférences lieu (csv)'),
         validator: _optionalCsvValidator,
       ),
     ];
@@ -1167,15 +1579,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
           'objectifPostbac': _objectifController.text.trim(),
           'centresInteret': _csvToList(_competencesController.text),
         },
-        UserRole.emploi => {
-          'niveauEtude': _niveauController.text.trim(),
-          'domaine': _domaineController.text.trim(),
-          'competences': _csvToList(_competencesController.text),
-          'objectif': _objectifController.text.trim(),
-          'experiences': _csvToList(_experiencesController.text),
-          'preferencesSecteur': _csvToList(_preferencesSecteurController.text),
-          'preferencesLieu': _csvToList(_preferencesLieuController.text),
-        },
         UserRole.entreprise => {
           'raisonSociale': _raisonSocialeController.text.trim(),
           'secteurActivite': _secteurActiviteController.text.trim(),
@@ -1223,3 +1626,322 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         .toList();
   }
 }
+
+class _SchoolFormSheet extends StatefulWidget {
+  const _SchoolFormSheet({this.initial});
+  final Map<String, dynamic>? initial;
+
+  @override
+  State<_SchoolFormSheet> createState() => _SchoolFormSheetState();
+}
+
+class _SchoolFormSheetState extends State<_SchoolFormSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nomController;
+  late final TextEditingController _domainesController;
+  late final TextEditingController _diplomesController;
+  late final TextEditingController _descriptionController;
+  late final TextEditingController _adresseController;
+  late final TextEditingController _siteWebController;
+  String _statut = 'PRIVE';
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial ?? const <String, dynamic>{};
+    _nomController = TextEditingController(
+        text: initial['nomEtablissement']?.toString() ?? '');
+    _domainesController = TextEditingController(
+        text: ((initial['domaines'] as List?)
+                ?.map((e) => e.toString())
+                .join(', ')) ??
+            '');
+    _diplomesController = TextEditingController(
+        text: ((initial['diplomesDelivres'] as List?)
+                ?.map((e) => e.toString())
+                .join(', ')) ??
+            '');
+    _descriptionController = TextEditingController(
+        text: initial['description']?.toString() ?? '');
+    _adresseController =
+        TextEditingController(text: initial['adresse']?.toString() ?? '');
+    _siteWebController =
+        TextEditingController(text: initial['siteWeb']?.toString() ?? '');
+    final s = initial['statut']?.toString().toUpperCase();
+    if (s == 'PUBLIC' || s == 'PRIVE') _statut = s!;
+  }
+
+  @override
+  void dispose() {
+    _nomController.dispose();
+    _domainesController.dispose();
+    _diplomesController.dispose();
+    _descriptionController.dispose();
+    _adresseController.dispose();
+    _siteWebController.dispose();
+    super.dispose();
+  }
+
+  List<String> _csv(String v) => v
+      .split(',')
+      .map((e) => e.trim())
+      .where((e) => e.isNotEmpty)
+      .toList();
+
+  void _submit() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    Navigator.of(context).pop({
+      'nomEtablissement': _nomController.text.trim(),
+      'statut': _statut,
+      'domaines': _csv(_domainesController.text),
+      'diplomesDelivres': _csv(_diplomesController.text),
+      'description': _descriptionController.text.trim(),
+      'adresse': _adresseController.text.trim(),
+      'siteWeb': _siteWebController.text.trim(),
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                widget.initial == null
+                    ? 'Créer ma fiche école'
+                    : 'Modifier ma fiche école',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _nomController,
+                decoration: const InputDecoration(
+                    labelText: 'Nom de l\'établissement *'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Champ requis'
+                    : null,
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: _statut,
+                decoration: const InputDecoration(labelText: 'Statut'),
+                items: const [
+                  DropdownMenuItem(value: 'PUBLIC', child: Text('Public')),
+                  DropdownMenuItem(value: 'PRIVE', child: Text('Privé')),
+                ],
+                onChanged: (v) {
+                  if (v != null) setState(() => _statut = v);
+                },
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _domainesController,
+                decoration: const InputDecoration(
+                  labelText: 'Domaines (séparés par des virgules)',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _diplomesController,
+                decoration: const InputDecoration(
+                  labelText: 'Diplômes délivrés (séparés par des virgules)',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _descriptionController,
+                maxLines: 4,
+                decoration: const InputDecoration(labelText: 'Description'),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _adresseController,
+                decoration: const InputDecoration(labelText: 'Adresse'),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _siteWebController,
+                decoration: const InputDecoration(labelText: 'Site web'),
+                keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _submit,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Enregistrer'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompanyFormSheet extends StatefulWidget {
+  const _CompanyFormSheet({this.initial});
+  final Map<String, dynamic>? initial;
+
+  @override
+  State<_CompanyFormSheet> createState() => _CompanyFormSheetState();
+}
+
+class _CompanyFormSheetState extends State<_CompanyFormSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _raisonController;
+  late final TextEditingController _secteurController;
+  late final TextEditingController _descriptionController;
+  late final TextEditingController _adresseController;
+  late final TextEditingController _siteWebController;
+  late final TextEditingController _logoController;
+  String _taille = 'PME';
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial ?? const <String, dynamic>{};
+    _raisonController = TextEditingController(
+        text: initial['raisonSociale']?.toString() ?? '');
+    _secteurController = TextEditingController(
+        text: initial['secteurActivite']?.toString() ?? '');
+    _descriptionController = TextEditingController(
+        text: initial['description']?.toString() ?? '');
+    _adresseController =
+        TextEditingController(text: initial['adresse']?.toString() ?? '');
+    _siteWebController =
+        TextEditingController(text: initial['siteWeb']?.toString() ?? '');
+    _logoController =
+        TextEditingController(text: initial['logoUrl']?.toString() ?? '');
+    final t = initial['taille']?.toString().toUpperCase();
+    if (t == 'MICRO' || t == 'PME' || t == 'ETI' || t == 'GE') _taille = t!;
+  }
+
+  @override
+  void dispose() {
+    _raisonController.dispose();
+    _secteurController.dispose();
+    _descriptionController.dispose();
+    _adresseController.dispose();
+    _siteWebController.dispose();
+    _logoController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    Navigator.of(context).pop({
+      'raisonSociale': _raisonController.text.trim(),
+      'secteurActivite': _secteurController.text.trim(),
+      'taille': _taille,
+      'description': _descriptionController.text.trim(),
+      'adresse': _adresseController.text.trim(),
+      'siteWeb': _siteWebController.text.trim(),
+      'logoUrl': _logoController.text.trim(),
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                widget.initial == null
+                    ? 'Créer ma fiche entreprise'
+                    : 'Modifier ma fiche entreprise',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _raisonController,
+                decoration:
+                    const InputDecoration(labelText: 'Raison sociale *'),
+                validator: (v) {
+                  final t = (v ?? '').trim();
+                  if (t.isEmpty) return 'Champ requis';
+                  if (t.length < 2 || t.length > 150) {
+                    return 'Doit faire entre 2 et 150 caractères';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _secteurController,
+                decoration:
+                    const InputDecoration(labelText: 'Secteur d\'activité'),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: _taille,
+                decoration: const InputDecoration(labelText: 'Taille'),
+                items: const [
+                  DropdownMenuItem(value: 'MICRO', child: Text('Micro')),
+                  DropdownMenuItem(value: 'PME', child: Text('PME')),
+                  DropdownMenuItem(value: 'ETI', child: Text('ETI')),
+                  DropdownMenuItem(value: 'GE', child: Text('Grande entreprise')),
+                ],
+                onChanged: (v) {
+                  if (v != null) setState(() => _taille = v);
+                },
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _descriptionController,
+                maxLines: 4,
+                decoration: const InputDecoration(labelText: 'Description'),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _adresseController,
+                decoration: const InputDecoration(labelText: 'Adresse'),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _siteWebController,
+                decoration: const InputDecoration(labelText: 'Site web'),
+                keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _logoController,
+                decoration: const InputDecoration(labelText: 'URL du logo'),
+                keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _submit,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Enregistrer'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+

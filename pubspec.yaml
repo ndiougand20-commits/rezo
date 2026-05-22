@@ -37,6 +37,8 @@ dependencies:
   http: ^1.6.0
   flutter_secure_storage: ^9.2.4
   file_picker: ^10.1.9
+  video_player: ^2.9.5
+  shared_preferences: ^2.3.3
 
 dev_dependencies:
   flutter_test:
@@ -61,6 +63,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/REZO_Logo.png
+    - assets/splashscreen/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

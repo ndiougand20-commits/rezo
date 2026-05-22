@@ -2404,3 +2404,334 @@ Image.network(
 | GET | `/api/features/access-summary` | JWT | * | Resume droits |
 | GET | `/` | - | - | Health check |
 | GET | `/ping` | - | - | Ping → pong |
+
+---
+
+## 16. Plan d'integration frontend (pas a pas, de A a Z)
+
+Cette section te donne un ordre de mise en oeuvre recommande pour integrer le backend sans dette technique.
+
+### 16.1 Sprint 1 - Fondations reseau et session
+
+Objectif: etre capable de se connecter, persister la session, et securiser les routes privees.
+
+1. Configurer un client HTTP unique (Dio / Axios / Fetch wrapper).
+2. Ajouter un interceptor request pour injecter `Authorization: Bearer <token>`.
+3. Ajouter un interceptor response pour traiter les `401`:
+   - vider le token
+   - vider le cache utilisateur
+   - rediriger vers login
+4. Ajouter un `SessionGuard` sur les routes privees.
+5. Ajouter un ecran Splash au boot:
+   - lire token
+   - verifier expiration locale (`exp`) si decode possible
+   - router vers `Login` ou `Home`
+
+Livrable attendu:
+- login/logout robustes
+- pas d'acces prive sans token
+- redirection automatique sur session invalide
+
+### 16.2 Sprint 2 - Profil utilisateur complet
+
+Objectif: afficher et modifier `/api/users/me` avec formulaire dynamique selon role.
+
+1. Consommer `GET /api/users/me`.
+2. Mapper la reponse vers un modele frontend unique.
+3. Construire l'UI conditionnelle par role (`ETUDIANT`, `LYCEEN`, `ENTREPRISE`, etc.).
+4. Implementer `PUT /api/users/me` avec payload partiel.
+5. Integrer `PUT /api/users/me/pack`.
+6. Mettre a jour l'etat local apres chaque mutation.
+
+Livrable attendu:
+- page profil dynamique
+- edition persistante
+- changement de pack fonctionnel
+
+### 16.3 Sprint 3 - Domaines metier principaux
+
+Objectif: publier/consommer contenu coeur produit.
+
+1. Ecrans listing/detail pour entreprises, ecoles, offres.
+2. CRUD prive pour roles autorises:
+   - entreprise: fiche entreprise + offres
+   - ecole: fiche ecole + offres
+3. Ecran matching `GET /api/match/recommendations`.
+4. Ecran messagerie:
+   - liste
+   - conversation
+   - envoi
+   - marquage lu
+
+Livrable attendu:
+- parcours metier principal complet
+
+### 16.4 Sprint 4 - Media, droits, durcissement UX
+
+Objectif: finaliser les details production-ready.
+
+1. Upload photos/PDF (`multipart/form-data`).
+2. Integration de `/api/features/access-summary` pour masquer/afficher des actions.
+3. Gestion offline/timeout/retry.
+4. Instrumentation analytics/logging (erreurs, taux de 401, latence).
+5. Tests E2E des parcours critiques.
+
+Livrable attendu:
+- UX stable
+- gestion d'erreurs coherente
+- feature flags pack fully integrated
+
+---
+
+## 17. Architecture frontend recommandee
+
+### 17.1 Couches
+
+1. `core/network`: client HTTP, interceptors, parse erreurs.
+2. `core/session`: stockage token, session manager, logout global.
+3. `features/<module>/data`: datasource API + mapping DTO.
+4. `features/<module>/domain`: modeles metier + cas d'usage.
+5. `features/<module>/presentation`: pages, controllers/viewmodels.
+
+### 17.2 Convention de nommage conseillee
+
+- DTO entrant API: `XxxResponseDto`
+- DTO sortant API: `XxxRequestDto`
+- modele UI interne: `XxxModel`
+- mapper: `XxxMapper`
+
+### 17.3 Regle importante
+
+Ne pas propager directement le JSON brut jusqu'a l'UI.
+
+Pourquoi:
+- evite les regressions si le backend evolue
+- rend le typage et les tests plus fiables
+- facilite le cache local
+
+---
+
+## 18. Mapping ecrans frontend -> endpoints backend
+
+| Ecran frontend | Endpoint(s) principal(aux) | Auth | Notes integration |
+|----------------|-----------------------------|------|-------------------|
+| Splash | - | - | Check token local + expiration locale |
+| Login | `POST /api/auth/login` | Public | Sauver token puis preload profil |
+| Signup | `POST /api/auth/signup` | Public | Form different selon role |
+| Home | `GET /api/features/access-summary` | JWT | Conditionner les cards/CTA |
+| Mon Profil | `GET /api/users/me` | JWT | Source de verite utilisateur |
+| Edit Profil | `PUT /api/users/me` | JWT | Payload partiel uniquement |
+| Packs | `GET /api/packs`, `PUT /api/users/me/pack` | Mixte | Afficher compatibilite role |
+| Entreprises | `GET /api/companies`, `POST/PUT/DELETE /api/companies` | Mixte | CRUD protege owner |
+| Ecoles | `GET /api/schools`, `POST/PUT/DELETE /api/schools` | Mixte | CRUD protege owner |
+| Offres | `GET /api/offers`, `POST/PUT/DELETE /api/offers` | Mixte | Controle role + pack |
+| Matching | `GET /api/match/recommendations` | JWT | Afficher score + raisons + suggestedPack |
+| Messages liste | `GET /api/messages` | JWT | Pagine + filtre read |
+| Conversation | `GET /api/messages/conversation/{userId}`, `POST /api/messages` | JWT | Polling ou refresh manuel |
+| Media | `GET/POST/DELETE /api/users/me/media*` | JWT | `fileUrl` relatif -> URL absolue |
+
+---
+
+## 19. Contrat d'erreurs frontend unifie
+
+### 19.1 Structure a normaliser cote frontend
+
+```json
+{
+  "status": 403,
+  "title": "FORBIDDEN",
+  "userMessage": "Votre pack actuel ne permet pas cette action",
+  "technicalMessage": "Votre pack actuel ne permet pas de publier ou gerer des offres",
+  "traceId": null
+}
+```
+
+### 19.2 Strategie UX recommandee
+
+1. `400`: erreurs de formulaire, afficher sous les champs.
+2. `401`: session expiree, redirection login + snackbar.
+3. `403`: action interdite, afficher CTA upgrade pack si pertinent.
+4. `404`: ressource absente, fallback UI (empty/error state).
+5. `409`: conflit (email, nom pack), proposer correction.
+6. `5xx`: message generique + bouton retry.
+
+### 19.3 Regle de retry
+
+- Retry automatique seulement pour:
+  - timeout reseau
+  - DNS/transient network
+- Pas de retry automatique pour:
+  - `400`, `401`, `403`, `404`, `409`
+
+---
+
+## 20. Snippets TypeScript (React / Next / Vue)
+
+### 20.1 Client API minimal avec gestion 401
+
+```ts
+type ApiError = {
+  status: number;
+  message: string;
+};
+
+const API_BASE_URL = "http://localhost:8082";
+
+async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const token = localStorage.getItem("jwt_token");
+
+  const headers: Record<string, string> = {
+    ...(init.headers as Record<string, string> | undefined),
+  };
+
+  if (!headers["Content-Type"] && !(init.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers,
+  });
+
+  if (response.status === 401) {
+    localStorage.removeItem("jwt_token");
+    window.location.href = "/login";
+    throw { status: 401, message: "Session expiree" } satisfies ApiError;
+  }
+
+  if (!response.ok) {
+    let message = "Erreur inconnue";
+    try {
+      const data = await response.json();
+      message = data?.message ?? message;
+    } catch {
+      // ignore parse error
+    }
+    throw { status: response.status, message } satisfies ApiError;
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
+```
+
+### 20.2 Exemple d'appel: recuperer mon profil
+
+```ts
+type UserMeResponse = {
+  id: string;
+  email: string;
+  prenom: string;
+  nom: string;
+  role: "ETUDIANT" | "LYCEEN" | "EMPLOI" | "ENTREPRISE" | "ECOLE" | "ADMIN";
+  packNom: string;
+  canUseMessaging: boolean;
+  canManageOffers: boolean;
+  canUseAiChat: boolean;
+  profil: Record<string, unknown>;
+};
+
+async function getMe(): Promise<UserMeResponse> {
+  return apiFetch<UserMeResponse>("/api/users/me");
+}
+```
+
+---
+
+## 21. Flux utilisateur cibles (par role)
+
+### 21.1 ETUDIANT / EMPLOI
+
+1. Signup role candidat.
+2. Login.
+3. Completer profil (`niveauEtude`, `domaine`, `competences`).
+4. Consommer matching.
+5. Contacter via messagerie si autorise.
+6. Uploader justificatifs.
+
+### 21.2 LYCEEN
+
+1. Signup lyceen.
+2. Renseigner orientation et centres d'interet.
+3. Consulter offres/stages/formations.
+4. Echanger avec ecoles/entreprises.
+
+### 21.3 ENTREPRISE
+
+1. Signup entreprise.
+2. Creer/editer fiche entreprise.
+3. Souscrire pack compatible si besoin.
+4. Publier offres.
+5. Traiter messages entrants.
+
+### 21.4 ECOLE
+
+1. Signup ecole.
+2. Creer/editer fiche ecole.
+3. Publier offres/formations.
+4. Repondre aux demandes via messagerie.
+
+---
+
+## 22. Checklists QA frontend (pret recette)
+
+### 22.1 Session et securite
+
+- [ ] Le token est persiste localement de facon securisee.
+- [ ] Toutes les routes privees sont bloquees sans token.
+- [ ] Toute reponse `401` provoque un logout propre.
+- [ ] Le header `Authorization` est envoye sur tous les endpoints proteges.
+
+### 22.2 Donnees et formulaires
+
+- [ ] Les enums sont bornees a la liste backend.
+- [ ] Les erreurs `400` sont affichees champ par champ si possible.
+- [ ] Les payloads d'update sont partiels (pas de champs inutiles).
+- [ ] Les dates d'offres sont validees cote UI avant envoi.
+
+### 22.3 Metier
+
+- [ ] Les actions soumises a pack sont correctement masquees/desactivees.
+- [ ] Le proprietaire uniquement peut voir les actions edit/delete sur ses ressources.
+- [ ] Les conversations et messages sont bien tries et pagines.
+- [ ] Les medias uploades sont affiches via URL absolue construite.
+
+### 22.4 Resilience UX
+
+- [ ] Timeout reseau gere avec retry manuel.
+- [ ] Etats loading / empty / error disponibles sur les listes.
+- [ ] Les boutons submit sont desactives pendant l'envoi.
+- [ ] Les toasts/snackbars sont coherents avec les codes HTTP.
+
+---
+
+## 23. Conseils de performance et robustesse
+
+1. Mettre en cache court terme `GET /api/packs`, `GET /api/companies`, `GET /api/schools`.
+2. Debouncer la recherche/filtering frontend sur les listes d'offres.
+3. Eviter les refetch complets inutiles apres mutation: patch local de l'etat quand possible.
+4. Utiliser une cle stable par ressource (`id`) pour listes virtuelles.
+5. Limiter la taille des images affichees dans l'UI (thumbnails).
+6. Ajouter des logs front pour diagnostiquer les erreurs 401/403 recurrentes.
+
+---
+
+## 24. Demarrage rapide (copier-coller process)
+
+1. Brancher `login` + stockage token.
+2. Brancher interceptor auth + gestion `401`.
+3. Brancher `GET /api/users/me` au demarrage.
+4. Brancher `GET /api/features/access-summary` pour afficher/masquer les modules.
+5. Ajouter profil edit (`PUT /api/users/me`).
+6. Ajouter modules offres/messages/matching.
+7. Ajouter media upload.
+8. Executer la checklist QA section 22 avant release.
+
+Avec cet ordre, tu integres le backend complet en minimisant les regressions et les effets de bord.

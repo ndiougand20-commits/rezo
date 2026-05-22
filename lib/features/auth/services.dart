@@ -25,25 +25,163 @@ abstract class AuthService {
   Future<Map<String, dynamic>> uploadJustificatifPdf({
     required Uint8List bytes,
     required String fileName,
+    String? category,
   });
 
   Future<List<Map<String, dynamic>>> listMyMedia({String? category});
 
   Future<void> deleteMyMedia(String mediaId);
+
+  // ---- Matching ----
+  Future<Map<String, dynamic>> fetchRecommendations({bool includeSwiped = false});
+
+  Future<Map<String, dynamic>> recordSwipe({
+    required String offerId,
+    required String action,
+  });
+
+  Future<Map<String, dynamic>> fetchSchoolRecommendations({String? secteur});
+
+  Future<Map<String, dynamic>> fetchProfileRecommendations({
+    bool includeSwiped = false,
+  });
+
+  Future<Map<String, dynamic>> recordProfileSwipe({
+    required String targetUserId,
+    required String action,
+  });
+
+  Future<List<Map<String, dynamic>>> fetchMutualMatches();
+
+  Future<Map<String, dynamic>> fetchMyStats();
+
+  Future<Map<String, dynamic>> sendChatMessage({
+    required String message,
+    required String sessionId,
+    String? context,
+  });
+
+  // ---- Messagerie ----
+  Future<Map<String, dynamic>> sendMessage({
+    required String receiverId,
+    required String content,
+    String? relatedOfferId,
+  });
+
+  Future<List<Map<String, dynamic>>> getConversation(String userId);
+
+  Future<Map<String, dynamic>> markMessageRead(String messageId);
+
+  Future<void> deleteMessage(String messageId);
+
+  // ---- Offres CRUD ----
+  Future<Map<String, dynamic>> createOffer(Map<String, dynamic> payload);
+
+  Future<Map<String, dynamic>> updateOffer(
+    String offerId,
+    Map<String, dynamic> payload,
+  );
+
+  Future<void> deleteOffer(String offerId);
+
+  Future<Map<String, dynamic>> uploadOfferPdf({
+    required String offerId,
+    required Uint8List bytes,
+    required String fileName,
+  });
+
+  Future<Map<String, dynamic>> getOfferLikedBy(String offerId);
+
+  // ---- Schools ----
+  Future<List<Map<String, dynamic>>> listSchools();
+
+  Future<Map<String, dynamic>> createSchool(Map<String, dynamic> payload);
+
+  Future<Map<String, dynamic>> updateSchool(
+    String schoolId,
+    Map<String, dynamic> payload,
+  );
+
+  // ---- Companies ----
+  Future<List<Map<String, dynamic>>> listCompanies();
+
+  Future<Map<String, dynamic>> createCompany(Map<String, dynamic> payload);
+
+  Future<Map<String, dynamic>> updateCompany(
+    String companyId,
+    Map<String, dynamic> payload,
+  );
+
+  // ---- Feature access ----
+  Future<Map<String, dynamic>> getFeatureAccess();
 }
 
 class HttpAuthService implements AuthService {
   HttpAuthService({required this.baseUrl, required this.tokenStorage});
 
-  static const defaultBaseUrl = kIsWeb
-      ? 'http://localhost:8082'
-      : 'http://10.0.2.2:8082';
+  static String get defaultBaseUrl {
+    final envBaseUrl = const String.fromEnvironment(
+      'REZO_API_BASE_URL',
+      defaultValue: '',
+    ).trim();
+    if (envBaseUrl.isNotEmpty) {
+      return envBaseUrl;
+    }
+    if (kIsWeb) {
+      return 'http://localhost:8080';
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      // Android emulator reaches host machine through 10.0.2.2
+      return 'http://10.0.2.2:8080';
+    }
+    // Windows/macOS/Linux/iOS simulator defaults to localhost backend.
+    return 'http://localhost:8080';
+  }
 
   final String baseUrl;
   final TokenStorage tokenStorage;
 
   Uri _uri(String path, [Map<String, String>? queryParameters]) {
     return Uri.parse('$baseUrl$path').replace(queryParameters: queryParameters);
+  }
+
+  // --- Wrappers réseau (G12.2) : convertissent les erreurs réseau en
+  // AuthException("Pas de connexion internet") pour un affichage uniforme.
+  Future<http.Response> _httpGet(Uri url, {Map<String, String>? headers}) =>
+      _safeNet(() => http.get(url, headers: headers));
+  Future<http.Response> _httpPost(Uri url,
+          {Map<String, String>? headers, Object? body}) =>
+      _safeNet(() => http.post(url, headers: headers, body: body));
+  Future<http.Response> _httpPut(Uri url,
+          {Map<String, String>? headers, Object? body}) =>
+      _safeNet(() => http.put(url, headers: headers, body: body));
+  Future<http.Response> _httpPatch(Uri url,
+          {Map<String, String>? headers, Object? body}) =>
+      _safeNet(() => http.patch(url, headers: headers, body: body));
+  Future<http.Response> _httpDelete(Uri url,
+          {Map<String, String>? headers, Object? body}) =>
+      _safeNet(() => http.delete(url, headers: headers, body: body));
+
+  Future<http.Response> _safeNet(
+      Future<http.Response> Function() request) async {
+    try {
+      return await request();
+    } on http.ClientException {
+      throw const AuthException('Pas de connexion internet');
+    } on FormatException {
+      rethrow;
+    } catch (e) {
+      // Erreurs réseau bas-niveau (SocketException, HandshakeException…)
+      // On évite d'importer dart:io pour rester compatible web.
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('socket') ||
+          msg.contains('failed host lookup') ||
+          msg.contains('connection') ||
+          msg.contains('handshake')) {
+        throw const AuthException('Pas de connexion internet');
+      }
+      rethrow;
+    }
   }
 
   Future<Map<String, String>> _headers({bool authenticated = false}) async {
@@ -117,6 +255,7 @@ class HttpAuthService implements AuthService {
     required String fieldName,
     required Uint8List bytes,
     required String fileName,
+    Map<String, String>? fields,
   }) async {
     final request = http.MultipartRequest('POST', _uri(path));
     final token = await tokenStorage.readToken();
@@ -127,6 +266,9 @@ class HttpAuthService implements AuthService {
     request.files.add(
       http.MultipartFile.fromBytes(fieldName, bytes, filename: fileName),
     );
+    if (fields != null) {
+      request.fields.addAll(fields);
+    }
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
     return _requireSuccess(response, (body) => _asMap(_extractData(body)));
@@ -134,8 +276,8 @@ class HttpAuthService implements AuthService {
 
   @override
   Future<void> signup(Map<String, dynamic> payload) async {
-    final response = await http.post(
-      _uri('/auth/register'),
+    final response = await _httpPost(
+      _uri('/api/auth/signup'),
       headers: await _headers(),
       body: jsonEncode(payload),
     );
@@ -147,8 +289,8 @@ class HttpAuthService implements AuthService {
     required String email,
     required String password,
   }) async {
-    final response = await http.post(
-      _uri('/auth/login'),
+    final response = await _httpPost(
+      _uri('/api/auth/login'),
       headers: await _headers(),
       body: jsonEncode({'email': email, 'password': password}),
     );
@@ -168,8 +310,8 @@ class HttpAuthService implements AuthService {
 
   @override
   Future<Map<String, dynamic>> getMe() async {
-    final response = await http.get(
-      _uri('/auth/me'),
+    final response = await _httpGet(
+      _uri('/api/users/me'),
       headers: await _headers(authenticated: true),
     );
     return _requireSuccess(response, (body) => _asMap(_extractData(body)));
@@ -177,8 +319,8 @@ class HttpAuthService implements AuthService {
 
   @override
   Future<Map<String, dynamic>> updateMe(Map<String, dynamic> payload) async {
-    final response = await http.put(
-      _uri('/auth/me'),
+    final response = await _httpPut(
+      _uri('/api/users/me'),
       headers: await _headers(authenticated: true),
       body: jsonEncode(payload),
     );
@@ -187,8 +329,8 @@ class HttpAuthService implements AuthService {
 
   @override
   Future<Map<String, dynamic>> updatePack(String packId) async {
-    final response = await http.patch(
-      _uri('/auth/me/pack'),
+    final response = await _httpPatch(
+      _uri('/api/users/me/pack'),
       headers: await _headers(authenticated: true),
       body: jsonEncode({'packId': packId}),
     );
@@ -197,8 +339,8 @@ class HttpAuthService implements AuthService {
 
   @override
   Future<List<Map<String, dynamic>>> getPacks() async {
-    final response = await http.get(
-      _uri('/packs'),
+    final response = await _httpGet(
+      _uri('/api/packs'),
       headers: await _headers(authenticated: true),
     );
     return _requireSuccess(response, (body) => _asList(_extractData(body)));
@@ -206,17 +348,23 @@ class HttpAuthService implements AuthService {
 
   @override
   Future<List<Map<String, dynamic>>> getMessages() async {
-    final response = await http.get(
-      _uri('/messages'),
+    final response = await _httpGet(
+      _uri('/api/messages'),
       headers: await _headers(authenticated: true),
     );
-    return _requireSuccess(response, (body) => _asList(_extractData(body)));
+    return _requireSuccess(response, (body) {
+      final data = _extractData(body);
+      if (data is Map && data['items'] is List) {
+        return _asList(data['items']);
+      }
+      return _asList(data);
+    });
   }
 
   @override
   Future<List<Map<String, dynamic>>> getOffers() async {
-    final response = await http.get(
-      _uri('/offres'),
+    final response = await _httpGet(
+      _uri('/api/offers'),
       headers: await _headers(authenticated: true),
     );
     return _requireSuccess(response, (body) => _asList(_extractData(body)));
@@ -228,7 +376,7 @@ class HttpAuthService implements AuthService {
     required String fileName,
   }) {
     return _sendMultipart(
-      path: '/auth/me/photo',
+      path: '/api/users/me/media/photos',
       fieldName: 'file',
       bytes: bytes,
       fileName: fileName,
@@ -239,19 +387,24 @@ class HttpAuthService implements AuthService {
   Future<Map<String, dynamic>> uploadJustificatifPdf({
     required Uint8List bytes,
     required String fileName,
+    String? category,
   }) {
     return _sendMultipart(
-      path: '/auth/me/justificatifs',
+      path: '/api/users/me/media/justificatifs',
       fieldName: 'file',
       bytes: bytes,
       fileName: fileName,
+      fields: category == null || category.trim().isEmpty
+          ? null
+          : <String, String>{'category': category.trim()},
     );
   }
 
   @override
   Future<List<Map<String, dynamic>>> listMyMedia({String? category}) async {
-    final response = await http.get(
-      _uri('/auth/me/media', category == null ? null : {'category': category}),
+    final response = await _httpGet(
+      _uri('/api/users/me/media',
+          category == null ? null : {'category': category}),
       headers: await _headers(authenticated: true),
     );
     return _requireSuccess(response, (body) => _asList(_extractData(body)));
@@ -259,11 +412,315 @@ class HttpAuthService implements AuthService {
 
   @override
   Future<void> deleteMyMedia(String mediaId) async {
-    final response = await http.delete(
-      _uri('/auth/me/media/$mediaId'),
+    final response = await _httpDelete(
+      _uri('/api/users/me/media/$mediaId'),
       headers: await _headers(authenticated: true),
     );
     _requireSuccess<void>(response, (_) {});
+  }
+
+  // ============================================================
+  // Matching
+  // ============================================================
+
+  @override
+  Future<Map<String, dynamic>> fetchRecommendations({bool includeSwiped = false}) async {
+    final query = includeSwiped ? <String, String>{'includeSwiped': 'true'} : null;
+    final response = await _httpGet(
+      _uri('/api/match/recommendations', query),
+      headers: await _headers(authenticated: true),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
+  }
+
+  @override
+  Future<Map<String, dynamic>> recordSwipe({
+    required String offerId,
+    required String action,
+  }) async {
+    final response = await _httpPost(
+      _uri('/api/match/swipe'),
+      headers: await _headers(authenticated: true),
+      body: jsonEncode({'offerId': offerId, 'action': action}),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
+  }
+
+  @override
+  Future<Map<String, dynamic>> fetchSchoolRecommendations({String? secteur}) async {
+    final query = <String, String>{};
+    if (secteur != null && secteur.trim().isNotEmpty) {
+      query['secteur'] = secteur.trim();
+    }
+    final response = await _httpGet(
+      _uri('/api/match/school-recommendations', query.isEmpty ? null : query),
+      headers: await _headers(authenticated: true),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
+  }
+
+  @override
+  Future<Map<String, dynamic>> fetchProfileRecommendations({
+    bool includeSwiped = false,
+  }) async {
+    final query = includeSwiped ? <String, String>{'includeSwiped': 'true'} : null;
+    final response = await _httpGet(
+      _uri('/api/match/profile-recommendations', query),
+      headers: await _headers(authenticated: true),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
+  }
+
+  @override
+  Future<Map<String, dynamic>> recordProfileSwipe({
+    required String targetUserId,
+    required String action,
+  }) async {
+    final response = await _httpPost(
+      _uri('/api/match/profile-swipe'),
+      headers: await _headers(authenticated: true),
+      body: jsonEncode({'targetUserId': targetUserId, 'action': action}),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchMutualMatches() async {
+    final response = await _httpGet(
+      _uri('/api/match/mutual'),
+      headers: await _headers(authenticated: true),
+    );
+    return _requireSuccess(response, (body) {
+      final data = _asMap(_extractData(body));
+      if (data['mutualMatches'] is List) {
+        return _asList(data['mutualMatches']);
+      }
+      return _asList(data);
+    });
+  }
+
+  @override
+  Future<Map<String, dynamic>> fetchMyStats() async {
+    final response = await _httpGet(
+      _uri('/api/users/me/stats'),
+      headers: await _headers(authenticated: true),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
+  }
+
+  @override
+  Future<Map<String, dynamic>> sendChatMessage({
+    required String message,
+    required String sessionId,
+    String? context,
+  }) async {
+    final body = <String, dynamic>{
+      'message': message,
+      'sessionId': sessionId,
+      if (context != null && context.trim().isNotEmpty) 'context': context.trim(),
+    };
+    final response = await _httpPost(
+      _uri('/api/chat'),
+      headers: await _headers(authenticated: true),
+      body: jsonEncode(body),
+    );
+    return _requireSuccess(response, (b) => _asMap(_extractData(b)));
+  }
+
+  // ============================================================
+  // Messagerie
+  // ============================================================
+
+  @override
+  Future<Map<String, dynamic>> sendMessage({
+    required String receiverId,
+    required String content,
+    String? relatedOfferId,
+  }) async {
+    final body = <String, dynamic>{
+      'receiverId': receiverId,
+      'content': content,
+    };
+    if (relatedOfferId != null && relatedOfferId.isNotEmpty) {
+      body['relatedOfferId'] = relatedOfferId;
+    }
+    final response = await _httpPost(
+      _uri('/api/messages'),
+      headers: await _headers(authenticated: true),
+      body: jsonEncode(body),
+    );
+    return _requireSuccess(response, (b) => _asMap(_extractData(b)));
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getConversation(String userId) async {
+    final response = await _httpGet(
+      _uri('/api/messages/conversation/$userId'),
+      headers: await _headers(authenticated: true),
+    );
+    return _requireSuccess(response, (body) => _asList(_extractData(body)));
+  }
+
+  @override
+  Future<Map<String, dynamic>> markMessageRead(String messageId) async {
+    final response = await _httpPut(
+      _uri('/api/messages/$messageId/read'),
+      headers: await _headers(authenticated: true),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
+  }
+
+  @override
+  Future<void> deleteMessage(String messageId) async {
+    final response = await _httpDelete(
+      _uri('/api/messages/$messageId'),
+      headers: await _headers(authenticated: true),
+    );
+    _requireSuccess<void>(response, (_) {});
+  }
+
+  // ============================================================
+  // Offres CRUD
+  // ============================================================
+
+  @override
+  Future<Map<String, dynamic>> createOffer(Map<String, dynamic> payload) async {
+    final response = await _httpPost(
+      _uri('/api/offers'),
+      headers: await _headers(authenticated: true),
+      body: jsonEncode(payload),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateOffer(
+    String offerId,
+    Map<String, dynamic> payload,
+  ) async {
+    final response = await _httpPut(
+      _uri('/api/offers/$offerId'),
+      headers: await _headers(authenticated: true),
+      body: jsonEncode(payload),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
+  }
+
+  @override
+  Future<void> deleteOffer(String offerId) async {
+    final response = await _httpDelete(
+      _uri('/api/offers/$offerId'),
+      headers: await _headers(authenticated: true),
+    );
+    _requireSuccess<void>(response, (_) {});
+  }
+
+  @override
+  Future<Map<String, dynamic>> uploadOfferPdf({
+    required String offerId,
+    required Uint8List bytes,
+    required String fileName,
+  }) {
+    return _sendMultipart(
+      path: '/api/offers/$offerId/media',
+      fieldName: 'file',
+      bytes: bytes,
+      fileName: fileName,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> getOfferLikedBy(String offerId) async {
+    final response = await _httpGet(
+      _uri('/api/offers/$offerId/liked-by'),
+      headers: await _headers(authenticated: true),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
+  }
+
+  // ============================================================
+  // Schools
+  // ============================================================
+
+  @override
+  Future<List<Map<String, dynamic>>> listSchools() async {
+    final response = await _httpGet(
+      _uri('/api/schools'),
+      headers: await _headers(),
+    );
+    return _requireSuccess(response, (body) => _asList(_extractData(body)));
+  }
+
+  @override
+  Future<Map<String, dynamic>> createSchool(Map<String, dynamic> payload) async {
+    final response = await _httpPost(
+      _uri('/api/schools'),
+      headers: await _headers(authenticated: true),
+      body: jsonEncode(payload),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateSchool(
+    String schoolId,
+    Map<String, dynamic> payload,
+  ) async {
+    final response = await _httpPut(
+      _uri('/api/schools/$schoolId'),
+      headers: await _headers(authenticated: true),
+      body: jsonEncode(payload),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
+  }
+
+  // ============================================================
+  // Companies
+  // ============================================================
+
+  @override
+  Future<List<Map<String, dynamic>>> listCompanies() async {
+    final response = await _httpGet(
+      _uri('/api/companies'),
+      headers: await _headers(),
+    );
+    return _requireSuccess(response, (body) => _asList(_extractData(body)));
+  }
+
+  @override
+  Future<Map<String, dynamic>> createCompany(Map<String, dynamic> payload) async {
+    final response = await _httpPost(
+      _uri('/api/companies'),
+      headers: await _headers(authenticated: true),
+      body: jsonEncode(payload),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateCompany(
+    String companyId,
+    Map<String, dynamic> payload,
+  ) async {
+    final response = await _httpPut(
+      _uri('/api/companies/$companyId'),
+      headers: await _headers(authenticated: true),
+      body: jsonEncode(payload),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
+  }
+
+  // ============================================================
+  // Feature access
+  // ============================================================
+
+  @override
+  Future<Map<String, dynamic>> getFeatureAccess() async {
+    final response = await _httpGet(
+      _uri('/api/features/access-summary'),
+      headers: await _headers(authenticated: true),
+    );
+    return _requireSuccess(response, (body) => _asMap(_extractData(body)));
   }
 
   String _extractErrorMessage(http.Response response) {

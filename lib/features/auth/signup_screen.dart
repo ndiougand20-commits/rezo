@@ -24,6 +24,10 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _competencesController = TextEditingController();
   final TextEditingController _objectifController = TextEditingController();
   final TextEditingController _experiencesController = TextEditingController();
+    final TextEditingController _preferencesSecteurController =
+      TextEditingController();
+    final TextEditingController _preferencesLieuController =
+      TextEditingController();
 
   final TextEditingController _classeActuelleController =
       TextEditingController();
@@ -43,6 +47,8 @@ class _SignupScreenState extends State<SignupScreen> {
       TextEditingController();
   final TextEditingController _siteEntrepriseController =
       TextEditingController();
+    final TextEditingController _logoEntrepriseController =
+      TextEditingController();
   String _tailleEntreprise = 'PME';
 
   final TextEditingController _nomEtablissementController =
@@ -51,7 +57,9 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _diplomesController = TextEditingController();
   final TextEditingController _descriptionEcoleController =
       TextEditingController();
+  final TextEditingController _adresseEcoleController = TextEditingController();
   final TextEditingController _siteEcoleController = TextEditingController();
+  final TextEditingController _logoEcoleController = TextEditingController();
   String _statutEcole = 'PRIVE';
 
   bool _loading = false;
@@ -76,6 +84,8 @@ class _SignupScreenState extends State<SignupScreen> {
       _competencesController,
       _objectifController,
       _experiencesController,
+      _preferencesSecteurController,
+      _preferencesLieuController,
       _classeActuelleController,
       _serieOrientationController,
       _objectifPostbacController,
@@ -85,11 +95,14 @@ class _SignupScreenState extends State<SignupScreen> {
       _descriptionEntrepriseController,
       _adresseEntrepriseController,
       _siteEntrepriseController,
+      _logoEntrepriseController,
       _nomEtablissementController,
       _domainesController,
       _diplomesController,
       _descriptionEcoleController,
+      _adresseEcoleController,
       _siteEcoleController,
+      _logoEcoleController,
     ]) {
       controller.dispose();
     }
@@ -135,7 +148,7 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Map<String, dynamic> _buildPayload() {
-    return {
+    final payload = <String, dynamic>{
       'email': _emailController.text.trim(),
       'password': _passwordController.text.trim(),
       'role': _selectedRole.apiValue,
@@ -150,6 +163,10 @@ class _SignupScreenState extends State<SignupScreen> {
             'competences': _splitList(_competencesController.text),
           if (_objectifController.text.trim().isNotEmpty)
             'objectif': _objectifController.text.trim(),
+          if (_splitList(_preferencesSecteurController.text).isNotEmpty)
+            'preferencesSecteur': _splitList(_preferencesSecteurController.text),
+          if (_splitList(_preferencesLieuController.text).isNotEmpty)
+            'preferencesLieu': _splitList(_preferencesLieuController.text),
           if (_splitList(_experiencesController.text).isNotEmpty)
             'experiences': _splitList(_experiencesController.text),
         },
@@ -160,16 +177,6 @@ class _SignupScreenState extends State<SignupScreen> {
           if (_splitList(_centresInteretController.text).isNotEmpty)
             'centresInteret': _splitList(_centresInteretController.text),
         },
-        UserRole.emploi => {
-          'niveauEtude': _niveauEtudeController.text.trim(),
-          'domaine': _domaineController.text.trim(),
-          if (_splitList(_competencesController.text).isNotEmpty)
-            'competences': _splitList(_competencesController.text),
-          if (_objectifController.text.trim().isNotEmpty)
-            'objectif': _objectifController.text.trim(),
-          if (_splitList(_experiencesController.text).isNotEmpty)
-            'experiences': _splitList(_experiencesController.text),
-        },
         UserRole.entreprise => {
           'raisonSociale': _raisonSocialeController.text.trim(),
           'secteurActivite': _secteurController.text.trim(),
@@ -179,6 +186,8 @@ class _SignupScreenState extends State<SignupScreen> {
             'adresse': _adresseEntrepriseController.text.trim(),
           if (_siteEntrepriseController.text.trim().isNotEmpty)
             'siteWeb': _siteEntrepriseController.text.trim(),
+          if (_logoEntrepriseController.text.trim().isNotEmpty)
+            'logoUrl': _logoEntrepriseController.text.trim(),
         },
         UserRole.ecole => {
           'nomEtablissement': _nomEtablissementController.text.trim(),
@@ -189,11 +198,19 @@ class _SignupScreenState extends State<SignupScreen> {
             'diplomesDelivres': _splitList(_diplomesController.text),
           if (_descriptionEcoleController.text.trim().isNotEmpty)
             'description': _descriptionEcoleController.text.trim(),
+          if (_adresseEcoleController.text.trim().isNotEmpty)
+            'adresse': _adresseEcoleController.text.trim(),
           if (_siteEcoleController.text.trim().isNotEmpty)
             'siteWeb': _siteEcoleController.text.trim(),
+          if (_logoEcoleController.text.trim().isNotEmpty)
+            'logoUrl': _logoEcoleController.text.trim(),
         },
       },
     };
+
+    payload.removeWhere((key, value) =>
+        value is String && value.trim().isEmpty);
+    return payload;
   }
 
   List<String> _splitList(String value) {
@@ -207,6 +224,7 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
+      showBackButton: false,
       title: 'Créer un compte',
       subtitle: 'Choisis ton rôle puis complète le formulaire adapté.',
       child: Form(
@@ -250,6 +268,7 @@ class _SignupScreenState extends State<SignupScreen> {
               controller: _telephoneController,
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(labelText: 'Téléphone'),
+              validator: _optionalPhoneValidator,
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -334,6 +353,20 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               maxLines: 2,
             ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _preferencesSecteurController,
+              decoration: const InputDecoration(
+                labelText: 'Préférences secteur (séparées par des virgules)',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _preferencesLieuController,
+              decoration: const InputDecoration(
+                labelText: 'Préférences lieu (séparées par des virgules)',
+              ),
+            ),
           ],
         );
       case UserRole.lyceen:
@@ -368,46 +401,6 @@ class _SignupScreenState extends State<SignupScreen> {
               decoration: const InputDecoration(
                 labelText: 'Centres d’intérêt (séparés par des virgules)',
               ),
-            ),
-          ],
-        );
-      case UserRole.emploi:
-        return Column(
-          key: const ValueKey('job-section'),
-          children: [
-            TextFormField(
-              controller: _niveauEtudeController,
-              decoration: const InputDecoration(labelText: 'Niveau d’étude'),
-              validator: (value) => _requiredField(value, 'Le niveau d’étude'),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _domaineController,
-              decoration: const InputDecoration(labelText: 'Domaine'),
-              validator: (value) => _requiredField(value, 'Le domaine'),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _competencesController,
-              decoration: const InputDecoration(
-                labelText: 'Compétences (séparées par des virgules)',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _objectifController,
-              decoration: const InputDecoration(
-                labelText: 'Objectif professionnel',
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _experiencesController,
-              decoration: const InputDecoration(
-                labelText: 'Expériences (séparées par des virgules)',
-              ),
-              maxLines: 2,
             ),
           ],
         );
@@ -461,6 +454,13 @@ class _SignupScreenState extends State<SignupScreen> {
               decoration: const InputDecoration(labelText: 'Site web'),
               validator: _optionalUrlValidator,
             ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _logoEntrepriseController,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(labelText: 'URL logo'),
+              validator: _optionalUrlValidator,
+            ),
           ],
         );
       case UserRole.ecole:
@@ -509,9 +509,21 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
             const SizedBox(height: 12),
             TextFormField(
+              controller: _adresseEcoleController,
+              decoration: const InputDecoration(labelText: 'Adresse'),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
               controller: _siteEcoleController,
               keyboardType: TextInputType.url,
               decoration: const InputDecoration(labelText: 'Site web'),
+              validator: _optionalUrlValidator,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _logoEcoleController,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(labelText: 'URL logo'),
               validator: _optionalUrlValidator,
             ),
           ],
