@@ -36,9 +36,38 @@ class _FakeAuthServiceWithRecommendations extends FakeAuthService {
   }
 }
 
+Future<void> _openLoginScreen(WidgetTester tester) async {
+  if (find.byType(RoleChoiceScreen).evaluate().isNotEmpty) {
+    final context = tester.element(find.byType(RoleChoiceScreen));
+    Navigator.of(context).pushReplacementNamed(
+      AppRoutes.welcome,
+      arguments: UserRole.etudiant,
+    );
+    await tester.pumpAndSettle();
+  }
+  final loginCta = find.widgetWithText(ElevatedButton, 'Se connecter');
+  await tester.ensureVisible(loginCta);
+  await tester.tap(loginCta);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _loginDefaultUser(WidgetTester tester) async {
+  await _openLoginScreen(tester);
+  await tester.enterText(
+    find.widgetWithText(TextFormField, 'Adresse e-mail'),
+    'awa@rezo.sn',
+  );
+  await tester.enterText(
+    find.widgetWithText(TextFormField, 'Mot de passe'),
+    'SecurePass123!',
+  );
+  await tester.tap(find.widgetWithText(ElevatedButton, 'Connexion'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   group('Auth tunnel UX', () {
-    testWidgets('welcome screen exposes onboarding and auth CTAs', (
+    testWidgets('role choice screen appears before welcome auth screen', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
@@ -49,6 +78,17 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.byType(RoleChoiceScreen), findsOneWidget);
+      expect(find.text('Choisis ton profil'), findsOneWidget);
+
+      final context = tester.element(find.byType(RoleChoiceScreen));
+      Navigator.of(context).pushReplacementNamed(
+        AppRoutes.welcome,
+        arguments: UserRole.etudiant,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(WelcomeScreen), findsOneWidget);
       expect(find.text('Le bon contact, au bon moment.'), findsOneWidget);
       expect(find.text('Se connecter'), findsOneWidget);
       expect(find.text('Créer un compte'), findsOneWidget);
@@ -82,22 +122,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final loginCta = find.widgetWithText(ElevatedButton, 'Se connecter');
-      await tester.ensureVisible(loginCta);
-      await tester.tap(loginCta, warnIfMissed: false);
-      await tester.pumpAndSettle();
-
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Adresse e-mail'),
-        'awa@rezo.sn',
-      );
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Mot de passe'),
-        'SecurePass123!',
-      );
-
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Connexion'));
-      await tester.pumpAndSettle();
+      await _loginDefaultUser(tester);
 
       expect(await storage.readToken(), equals('fake-jwt-token'));
       expect(find.textContaining('Dashboard'), findsOneWidget);
@@ -130,6 +155,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      final roleChoiceContext = tester.element(find.byType(RoleChoiceScreen));
+      Navigator.of(roleChoiceContext).pushReplacementNamed(
+        AppRoutes.welcome,
+        arguments: UserRole.etudiant,
+      );
+      await tester.pumpAndSettle();
+
       final context = tester.element(find.byType(WelcomeScreen));
       Navigator.of(context).pushNamed(AppRoutes.dashboard);
       await tester.pumpAndSettle();
@@ -149,21 +181,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final loginCta = find.widgetWithText(ElevatedButton, 'Se connecter');
-      await tester.ensureVisible(loginCta);
-      await tester.tap(loginCta, warnIfMissed: false);
-      await tester.pumpAndSettle();
-
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Adresse e-mail'),
-        'awa@rezo.sn',
-      );
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Mot de passe'),
-        'SecurePass123!',
-      );
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Connexion'));
-      await tester.pumpAndSettle();
+      await _loginDefaultUser(tester);
 
       await tester.tap(find.text('Profil'));
       await tester.pumpAndSettle();
@@ -185,21 +203,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final loginCta = find.widgetWithText(ElevatedButton, 'Se connecter');
-      await tester.ensureVisible(loginCta);
-      await tester.tap(loginCta, warnIfMissed: false);
-      await tester.pumpAndSettle();
-
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Adresse e-mail'),
-        'awa@rezo.sn',
-      );
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Mot de passe'),
-        'SecurePass123!',
-      );
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Connexion'));
-      await tester.pumpAndSettle();
+      await _loginDefaultUser(tester);
 
       await tester.tap(find.text('Profil'));
       await tester.pumpAndSettle();
@@ -222,21 +226,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final loginCta = find.widgetWithText(ElevatedButton, 'Se connecter');
-      await tester.ensureVisible(loginCta);
-      await tester.tap(loginCta, warnIfMissed: false);
-      await tester.pumpAndSettle();
-
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Adresse e-mail'),
-        'awa@rezo.sn',
-      );
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Mot de passe'),
-        'SecurePass123!',
-      );
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Connexion'));
-      await tester.pumpAndSettle();
+      await _loginDefaultUser(tester);
 
       await tester.tap(find.byIcon(Icons.account_circle_rounded));
       await tester.pumpAndSettle();
@@ -268,21 +258,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final loginCta = find.widgetWithText(ElevatedButton, 'Se connecter');
-      await tester.ensureVisible(loginCta);
-      await tester.tap(loginCta, warnIfMissed: false);
-      await tester.pumpAndSettle();
-
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Adresse e-mail'),
-        'awa@rezo.sn',
-      );
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Mot de passe'),
-        'SecurePass123!',
-      );
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Connexion'));
-      await tester.pumpAndSettle();
+      await _loginDefaultUser(tester);
 
       await tester.tap(find.text('Matching'));
       await tester.pumpAndSettle();

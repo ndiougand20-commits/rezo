@@ -1,7 +1,9 @@
 part of 'auth_flow.dart';
 
 class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({super.key});
+  const WelcomeScreen({super.key, this.selectedRole = UserRole.etudiant});
+
+  final UserRole selectedRole;
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +59,7 @@ class WelcomeScreen extends StatelessWidget {
             onPressed: () {
               Navigator.of(
                 context,
-              ).pushNamed(AppRoutes.signup, arguments: UserRole.etudiant);
+              ).pushNamed(AppRoutes.signup, arguments: selectedRole);
             },
             child: const Text('Créer un compte'),
           ),

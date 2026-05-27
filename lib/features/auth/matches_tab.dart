@@ -164,7 +164,7 @@ class _MatchesTabState extends State<_MatchesTab> {
       result.add(_MatchItem(
         offerId: item['offerId']?.toString() ?? offer['id']?.toString(),
         title: offer['titre']?.toString() ?? 'Sans titre',
-        subtitle: '$owner â€¢ $location',
+        subtitle: '$owner \u2022 $location',
         score: (item['score'] is num)
             ? (item['score'] as num).round()
             : int.tryParse('${item['score']}') ?? 0,
@@ -207,7 +207,7 @@ class _MatchesTabState extends State<_MatchesTab> {
       result.add(_MatchItem(
         title: school['nomEtablissement']?.toString() ?? 'Ecole',
         subtitle:
-            '${school['statut'] ?? ''} â€¢ ${school['adresse'] ?? ''}'.trim(),
+          '${school['statut'] ?? ''} \u2022 ${school['adresse'] ?? ''}'.trim(),
         score: (item['score'] is num)
             ? (item['score'] as num).round()
             : 0,
@@ -431,8 +431,8 @@ class _MatchesTabState extends State<_MatchesTab> {
               SizedBox(height: 12),
               _IntroStep(
                 icon: Icons.info_outline_rounded,
-                title: 'Ouvre le detail',
-                subtitle: 'pour comprendre pourquoi le profil te correspond.',
+                title: 'Touche le cercle',
+                subtitle: 'pour ouvrir la fiche et comprendre le match.',
               ),
             ],
           ),
@@ -552,40 +552,21 @@ class _MatchesTabState extends State<_MatchesTab> {
               : _buildSessionEnd(recommendations.length),
         ),
 
-        // Match actions
         if (current != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-            child: Column(
-              children: [
-                const Text(
-                  'Glisse la carte pour choisir, ou ouvre le detail.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF616161),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () => _showMatchDetail(current),
-                  icon: const Icon(Icons.info_outline_rounded, size: 18),
-                  label: const Text('Voir le detail'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black,
-                    side: const BorderSide(color: Color(0xFFD0D0D0)),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 14,
-                    ),
-                  ),
-                ),
-              ],
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: Text(
+              'Glisse la carte pour choisir, ou touche le cercle pour voir la fiche.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF616161),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           )
         else
-              const SizedBox(height: 24),
+          const SizedBox(height: 24),
         if (_suggestedPack != null && !_suggestedPackDismissed)
           _buildSuggestedPackBanner(),
       ],
@@ -652,7 +633,7 @@ class _MatchesTabState extends State<_MatchesTab> {
     }
 
     if (evaluatedCount == 0 && excludedSwipeCount > 0 && !_isReplayMode) {
-      return 'Tu as deja parcouru toutes les opportunites disponibles.\nDe nouvelles suggestions arrivent bientot.';
+      return 'Aucune nouvelle opportunite disponible pour le moment.\nTu peux reparcourir les profils precedemment ignores.';
     }
 
     if (_isReplayMode) {
@@ -715,6 +696,7 @@ class _MatchesTabState extends State<_MatchesTab> {
     final passOpacity = swipeProgress < 0 ? -swipeProgress : 0.0;
 
     return GestureDetector(
+      onTap: () => _showMatchDetail(match),
       onPanStart: _onPanStart,
       onPanUpdate: _onPanUpdate,
       onPanEnd: (d) => _onPanEnd(d, total),
@@ -730,7 +712,6 @@ class _MatchesTabState extends State<_MatchesTab> {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Round profile card
               Container(
                 width: 280,
                 height: 280,
@@ -759,7 +740,6 @@ class _MatchesTabState extends State<_MatchesTab> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Initials
                     Text(
                       _initials(match.title),
                       style: TextStyle(
@@ -769,7 +749,6 @@ class _MatchesTabState extends State<_MatchesTab> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // Name
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 32),
                       child: Text(
@@ -784,7 +763,6 @@ class _MatchesTabState extends State<_MatchesTab> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    // Subtitle
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 40),
                       child: Text(
@@ -799,7 +777,6 @@ class _MatchesTabState extends State<_MatchesTab> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    // Score badge
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -821,7 +798,6 @@ class _MatchesTabState extends State<_MatchesTab> {
                   ],
                 ),
               ),
-              // Type pill at top
               Positioned(
                 top: 0,
                 child: Container(
@@ -850,8 +826,6 @@ class _MatchesTabState extends State<_MatchesTab> {
                   ),
                 ),
               ),
-
-              // LIKE overlay
               if (likeOpacity > 0)
                 Positioned(
                   top: 20,
@@ -884,8 +858,6 @@ class _MatchesTabState extends State<_MatchesTab> {
                     ),
                   ),
                 ),
-
-              // NOPE overlay
               if (passOpacity > 0)
                 Positioned(
                   top: 20,
@@ -971,7 +943,7 @@ class _MatchesTabState extends State<_MatchesTab> {
               ),
               const SizedBox(height: 8),
               Text(
-                '$_likedCount aimÃ©s  â€¢  $_passedCount passÃ©s',
+                '$_likedCount aim\u00e9s  \u2022  $_passedCount pass\u00e9s',
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 15, color: Colors.black54),
               ),

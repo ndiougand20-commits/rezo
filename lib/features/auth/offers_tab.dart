@@ -11,6 +11,7 @@ class _OffersTabState extends State<_OffersTab> {
   bool _isLoading = true;
   String? _error;
   List<Map<String, dynamic>> _offers = const <Map<String, dynamic>>[];
+  Map<String, int> _likedCountByOfferId = const <String, int>{};
 
   @override
   void didChangeDependencies() {
@@ -45,9 +46,11 @@ class _OffersTabState extends State<_OffersTab> {
             '';
         return db.compareTo(da);
       });
+      final likedCountByOfferId = await _loadLikedCountsForOffers(mine);
       if (!mounted) return;
       setState(() {
         _offers = mine;
+        _likedCountByOfferId = likedCountByOfferId;
         _isLoading = false;
       });
     } on AuthException catch (e) {
@@ -60,9 +63,55 @@ class _OffersTabState extends State<_OffersTab> {
       if (!mounted) return;
       setState(() {
         _error = 'Impossible de charger les offres';
+        _likedCountByOfferId = const <String, int>{};
         _isLoading = false;
       });
     }
+  }
+
+  Future<Map<String, int>> _loadLikedCountsForOffers(
+    List<Map<String, dynamic>> offers,
+  ) async {
+    final appState = AppScope.of(context);
+    final counts = <String, int>{};
+
+    await Future.wait(
+      offers.map((offer) async {
+        final id = offer['id']?.toString();
+        if (id == null || id.isEmpty) return;
+
+        try {
+          final data = await appState.getOfferLikedBy(id);
+          counts[id] = _extractLikedCount(data);
+        } catch (_) {
+          counts[id] = 0;
+        }
+      }),
+    );
+
+    return counts;
+  }
+
+  int _extractLikedCount(Map<String, dynamic> data) {
+    final direct = (data['count'] as num?)?.toInt();
+    if (direct != null) return direct;
+
+    final users = data['users'];
+    if (users is List) return users.length;
+
+    final items = data['items'];
+    if (items is List) return items.length;
+
+    final likers = data['likers'];
+    if (likers is List) return likers.length;
+
+    return 0;
+  }
+
+  int _likedCountForOffer(Map<String, dynamic> offer) {
+    final id = offer['id']?.toString();
+    if (id == null || id.isEmpty) return 0;
+    return _likedCountByOfferId[id] ?? 0;
   }
 
   Future<void> _openOfferSheet({Map<String, dynamic>? existing}) async {
@@ -354,7 +403,7 @@ class _OffersTabState extends State<_OffersTab> {
                               onPressed: () => _showLikedBy(o),
                               icon: const Icon(Icons.favorite_outline_rounded,
                                   size: 16),
-                              label: const Text('Likés'),
+                              label: Text('Likés (${_likedCountForOffer(o)})'),
                             ),
                             const Spacer(),
                             IconButton(

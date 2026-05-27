@@ -71,7 +71,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _bootstrap() async {
     final appState = AppScope.of(context);
     final authenticated = await appState.restoreSession();
-    _nextRoute = authenticated ? AppRoutes.dashboard : AppRoutes.welcome;
+    _nextRoute = authenticated ? AppRoutes.dashboard : AppRoutes.roleChoice;
     _tryNavigate();
   }
 

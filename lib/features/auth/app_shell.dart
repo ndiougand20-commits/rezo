@@ -167,8 +167,15 @@ class _RezoAppState extends State<RezoApp> {
           switch (settings.name) {
             case AppRoutes.splash:
               return MaterialPageRoute(builder: (_) => const SplashScreen());
+            case AppRoutes.roleChoice:
+              return MaterialPageRoute(builder: (_) => const RoleChoiceScreen());
             case AppRoutes.welcome:
-              return MaterialPageRoute(builder: (_) => const WelcomeScreen());
+              return MaterialPageRoute(
+                builder: (_) => WelcomeScreen(
+                  selectedRole:
+                      settings.arguments as UserRole? ?? UserRole.etudiant,
+                ),
+              );
             case AppRoutes.onboarding:
               return MaterialPageRoute(
                 builder: (_) => const OnboardingScreen(),
@@ -191,7 +198,7 @@ class _RezoAppState extends State<RezoApp> {
               }
               return MaterialPageRoute(builder: (_) => const DashboardScreen());
             default:
-              return MaterialPageRoute(builder: (_) => const WelcomeScreen());
+              return MaterialPageRoute(builder: (_) => const RoleChoiceScreen());
           }
         },
       ),

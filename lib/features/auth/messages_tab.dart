@@ -10,6 +10,7 @@ class _MessagesTab extends StatefulWidget {
 class _MessagesTabState extends State<_MessagesTab> {
   List<_Conversation>? _conversations;
   Set<String> _matchedUserIds = <String>{};
+  Map<String, _MatchedMeta> _matchedMetaByUserId = <String, _MatchedMeta>{};
   bool _isLoading = true;
   String? _error;
   _Conversation? _selected;
@@ -41,20 +42,35 @@ class _MessagesTabState extends State<_MessagesTab> {
       final appState = AppScope.of(context);
       final mutual = await appState.fetchMutualMatches();
       final ids = <String>{};
+      final metaById = <String, _MatchedMeta>{};
       for (final entry in mutual) {
-        final id = entry['otherUserId']?.toString() ??
+        final id = entry['matchedUserId']?.toString() ??
+            entry['otherUserId']?.toString() ??
             entry['userId']?.toString() ??
             '';
         if (id.isNotEmpty) {
           ids.add(id);
+          final name = _firstNonEmpty([
+            entry['matchedUserName']?.toString(),
+            entry['otherUserName']?.toString(),
+            entry['userName']?.toString(),
+          ], fallback: 'Contact');
+          final matchedAt = entry['matchedAt']?.toString() ?? '';
+          metaById[id] = _MatchedMeta(name: name, matchedAt: matchedAt);
         }
       }
       if (!mounted) return;
-      setState(() => _matchedUserIds = ids);
+      setState(() {
+        _matchedUserIds = ids;
+        _matchedMetaByUserId = metaById;
+      });
     } catch (_) {
       // En cas d'erreur API, on garde une liste vide (aucune conversation visible).
       if (!mounted) return;
-      setState(() => _matchedUserIds = <String>{});
+      setState(() {
+        _matchedUserIds = <String>{};
+        _matchedMetaByUserId = <String, _MatchedMeta>{};
+      });
     }
   }
 
@@ -88,6 +104,30 @@ class _MessagesTabState extends State<_MessagesTab> {
       final grouped = _groupByInterlocutor(rawMessages, myId)
           .where((conv) => _matchedUserIds.contains(conv.otherUserId))
           .toList();
+      final existingIds = grouped.map((c) => c.otherUserId).toSet();
+      for (final matchedId in _matchedUserIds) {
+        if (existingIds.contains(matchedId)) continue;
+        final meta = _matchedMetaByUserId[matchedId];
+        grouped.add(
+          _Conversation(
+            otherUserId: matchedId,
+            otherName: meta?.name ?? 'Contact',
+            lastMessage: 'Nouveau match. Envoie ton premier message.',
+            lastDate: meta?.matchedAt ?? DateTime.now().toIso8601String(),
+            unreadCount: 0,
+            lastIsFromMe: false,
+            isMatch: true,
+            isSynthetic: true,
+          ),
+        );
+      }
+      grouped.sort((a, b) {
+        final da = DateTime.tryParse(a.lastDate) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final db = DateTime.tryParse(b.lastDate) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return db.compareTo(da);
+      });
       if (!mounted) return;
       setState(() {
         _conversations = grouped;
@@ -130,9 +170,13 @@ class _MessagesTabState extends State<_MessagesTab> {
       final isFromMe = senderId == myId;
       final otherId = isFromMe ? receiverId : senderId;
       if (otherId.isEmpty) continue;
-      final otherName = isFromMe
-          ? (m['receiverName']?.toString() ?? 'Contact')
-          : (m['senderName']?.toString() ?? 'Contact');
+      final rawOtherName = isFromMe
+          ? m['receiverName']?.toString()
+          : m['senderName']?.toString();
+      final otherName = _firstNonEmpty([
+        rawOtherName,
+        _matchedMetaByUserId[otherId]?.name,
+      ], fallback: 'Contact');
       byOther.putIfAbsent(otherId, () => <Map<String, dynamic>>[]).add(m);
       namesByOther.putIfAbsent(otherId, () => otherName);
     }
@@ -153,7 +197,10 @@ class _MessagesTabState extends State<_MessagesTab> {
       }).length;
       convs.add(_Conversation(
         otherUserId: entry.key,
-        otherName: namesByOther[entry.key] ?? 'Contact',
+        otherName: _firstNonEmpty([
+          namesByOther[entry.key],
+          _matchedMetaByUserId[entry.key]?.name,
+        ], fallback: 'Contact'),
         lastMessage: last['content']?.toString() ?? '',
         lastDate: last['createdAt']?.toString() ?? '',
         unreadCount: unread,
@@ -169,6 +216,15 @@ class _MessagesTabState extends State<_MessagesTab> {
       return db.compareTo(da);
     });
     return convs;
+  }
+
+  String _firstNonEmpty(List<String?> values, {required String fallback}) {
+    for (final value in values) {
+      if (value != null && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+    return fallback;
   }
 
   @override
@@ -209,7 +265,10 @@ class _MessagesTabState extends State<_MessagesTab> {
     if (_selected != null) {
       return _ConversationDetailView(
         conversation: _selected!,
-        onBack: () => setState(() => _selected = null),
+        onBack: () {
+          setState(() => _selected = null);
+          unawaited(_loadConversations());
+        },
         onChanged: _loadConversations,
       );
     }
@@ -240,7 +299,9 @@ class _MessagesTabState extends State<_MessagesTab> {
         separatorBuilder: (_, _) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final conv = conversations[index];
-          final preview = conv.lastIsFromMe
+          final preview = conv.isSynthetic
+            ? conv.lastMessage
+            : conv.lastIsFromMe
               ? 'Vous : ${conv.lastMessage}'
               : conv.lastMessage;
           final truncated =
@@ -320,6 +381,7 @@ class _Conversation {
     required this.unreadCount,
     required this.lastIsFromMe,
     required this.isMatch,
+    this.isSynthetic = false,
   });
 
   final String otherUserId;
@@ -329,6 +391,14 @@ class _Conversation {
   final int unreadCount;
   final bool lastIsFromMe;
   final bool isMatch;
+  final bool isSynthetic;
+}
+
+class _MatchedMeta {
+  const _MatchedMeta({required this.name, required this.matchedAt});
+
+  final String name;
+  final String matchedAt;
 }
 
 class _ConversationTile extends StatelessWidget {
@@ -374,48 +444,63 @@ class _ConversationTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (isMatch)
-            Container(
-              margin: const EdgeInsets.only(bottom: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF81C784)),
+      trailing: SizedBox(
+        width: 88,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(date, style: const TextStyle(fontSize: 12)),
+            if (isMatch || isUnread) const SizedBox(height: 4),
+            if (isMatch || isUnread)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isMatch)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF81C784)),
+                      ),
+                      child: const Text(
+                        'Match',
+                        style: TextStyle(
+                          color: Color(0xFF2E7D32),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  if (isMatch && isUnread) const SizedBox(width: 4),
+                  if (isUnread)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$unreadCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              child: const Text(
-                'Match',
-                style: TextStyle(
-                  color: Color(0xFF2E7D32),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          Text(date, style: const TextStyle(fontSize: 12)),
-          if (isUnread) ...[
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$unreadCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
           ],
-        ],
+        ),
       ),
       onTap: onTap,
     );
@@ -496,7 +581,6 @@ class _ConversationDetailViewState extends State<_ConversationDetailView> {
               .catchError((Object _) => <String, dynamic>{}));
         }
       }
-      widget.onChanged();
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -641,7 +725,18 @@ class _ConversationDetailViewState extends State<_ConversationDetailView> {
                         ),
                       ),
                     )
-                  : ListView.builder(
+                  : _messages.isEmpty
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text(
+                              'Vous avez matché. Démarrez la conversation en envoyant un message.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.black54),
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.all(16),
                       itemCount: _messages.length,

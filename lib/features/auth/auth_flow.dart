@@ -13,6 +13,7 @@ part 'services.dart';
 part 'state.dart';
 part 'app_shell.dart';
 part 'splash_screen.dart';
+part 'role_choice_screen.dart';
 part 'welcome_screen.dart';
 part 'onboarding_screen.dart';
 part 'login_screen.dart';
@@ -30,6 +31,7 @@ part 'fake_auth_service.dart';
 
 class AppRoutes {
   static const splash = '/';
+  static const roleChoice = '/role-choice';
   static const welcome = '/welcome';
   static const onboarding = '/onboarding';
   static const login = '/login';
