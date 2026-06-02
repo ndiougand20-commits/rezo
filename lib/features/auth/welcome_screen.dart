@@ -8,7 +8,7 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
-      title: 'Bienvenue sur REZO',
+      title: 'Bienvenue ${selectedRole.label}',
       subtitle: 'Un accès simple à votre réseau d’opportunités.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
