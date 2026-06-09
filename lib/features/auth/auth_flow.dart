@@ -20,6 +20,7 @@ part 'login_screen.dart';
 part 'signup_screen.dart';
 part 'dashboard_screen.dart';
 part 'matches_tab.dart';
+part 'report_tab.dart';
 part 'home_tab.dart';
 part 'messages_tab.dart';
 part 'profile_tab.dart';
@@ -37,6 +38,13 @@ class AppRoutes {
   static const login = '/login';
   static const signup = '/signup';
   static const dashboard = '/dashboard';
+}
+
+class LoginRouteArgs {
+  const LoginRouteArgs({this.initialEmail, this.selectedRole});
+
+  final String? initialEmail;
+  final UserRole? selectedRole;
 }
 
 class AuthException implements Exception {

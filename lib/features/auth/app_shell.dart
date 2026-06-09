@@ -181,9 +181,19 @@ class _RezoAppState extends State<RezoApp> {
                 builder: (_) => const OnboardingScreen(),
               );
             case AppRoutes.login:
+              final args = settings.arguments;
+              final loginArgs = args is LoginRouteArgs
+                  ? args
+                  : LoginRouteArgs(
+                      initialEmail: args as String?,
+                      selectedRole: null,
+                    );
               return MaterialPageRoute(
                 builder: (_) =>
-                    LoginScreen(initialEmail: settings.arguments as String?),
+                    LoginScreen(
+                      initialEmail: loginArgs.initialEmail,
+                      selectedRole: loginArgs.selectedRole,
+                    ),
               );
             case AppRoutes.signup:
               return MaterialPageRoute(

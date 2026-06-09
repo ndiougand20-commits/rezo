@@ -19,12 +19,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _currentIndex = index.clamp(0, _visibleTabs.length - 1));
   }
 
-  /// Navigue vers l'onglet Profil quel que soit son index actuel.
+  /// Ouvre la page profil via l'icône en haut.
   void goToProfile() {
-    final i = _visibleTabs.indexWhere((t) => t.kind == _TabKind.profile);
-    if (i < 0) return;
     if (!mounted) return;
-    setState(() => _currentIndex = i);
+    final appState = AppScope.of(context);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Profil')),
+          body: SafeArea(
+            child: _ProfileTab(
+              onLogout: () async {
+                await appState.logout();
+                if (!mounted) return;
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  AppRoutes.roleChoice,
+                  (route) => false,
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -49,25 +66,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     final current = _visibleTabs[_currentIndex];
-    final isMatchingTab = current.kind == _TabKind.matching;
-    final isProfileTab = current.kind == _TabKind.profile;
-
     return Scaffold(
-      appBar: isMatchingTab
-          ? null
-          : AppBar(
-              title: Text(current.title),
-              actions: [
-                if (!isProfileTab)
-                  IconButton(
-                    tooltip: 'Mon profil',
-                    onPressed: goToProfile,
-                    icon: const Icon(Icons.account_circle_rounded),
-                  ),
-              ],
-            ),
+      appBar: AppBar(
+        title: Text(current.title),
+        actions: [
+          IconButton(
+            tooltip: 'Mon profil',
+            onPressed: goToProfile,
+            icon: const Icon(Icons.account_circle_rounded),
+          ),
+        ],
+      ),
       body: SafeArea(
-        top: isMatchingTab,
+        top: false,
         bottom: false,
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 220),
@@ -102,20 +113,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }) {
     final tabs = <_TabSpec>[
       _TabSpec(
-        kind: _TabKind.home,
-        title: 'Dashboard',
-        label: 'Accueil',
-        icon: Icons.grid_view_rounded,
-        selectedIcon: Icons.grid_view,
-        widget: _HomeTab(
-          user: user,
-          role: role,
-          fullName: fullName,
-          onTabSwitch: (index) => setState(() => _currentIndex = index),
-          additionalInfo: role == UserRole.etudiant
-              ? 'Bienvenue sur votre tableau de bord étudiant. Ici, vous pouvez accéder à vos cours, vos messages, et vos opportunités.'
-              : null,
-        ),
+        kind: _TabKind.matching,
+        title: 'Matching',
+        label: 'Matching',
+        icon: Icons.swipe_outlined,
+        selectedIcon: Icons.swipe_rounded,
+        widget: const _MatchesTab(),
       ),
       _TabSpec(
         kind: _TabKind.messages,
@@ -126,12 +129,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         widget: const _MessagesTab(),
       ),
       _TabSpec(
-        kind: _TabKind.matching,
-        title: 'Matching',
-        label: 'Matching',
-        icon: Icons.swipe_outlined,
-        selectedIcon: Icons.swipe_rounded,
-        widget: const _MatchesTab(),
+        kind: _TabKind.report,
+        title: 'Rapport',
+        label: 'Rapport',
+        icon: Icons.insights_outlined,
+        selectedIcon: Icons.insights_rounded,
+        widget: _ReportTab(role: role),
       ),
     ];
 
@@ -157,28 +160,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ));
     }
 
-    tabs.add(_TabSpec(
-      kind: _TabKind.profile,
-      title: 'Profil',
-      label: 'Profil',
-      icon: Icons.person_outline_rounded,
-      selectedIcon: Icons.person_rounded,
-      widget: _ProfileTab(
-        onLogout: () async {
-          await appState.logout();
-          if (!mounted) return; // Ensure mounted before using context
-          Navigator.of(
-            context,
-          ).pushNamedAndRemoveUntil(AppRoutes.welcome, (route) => false);
-        },
-      ),
-    ));
-
     return tabs;
   }
 }
 
-enum _TabKind { home, messages, matching, offers, aiChat, profile }
+enum _TabKind { messages, matching, offers, aiChat, report }
 
 class _TabSpec {
   const _TabSpec({

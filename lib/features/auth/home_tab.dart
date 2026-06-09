@@ -165,15 +165,11 @@ class _HomeTab extends StatefulWidget {
     required this.user,
     required this.role,
     required this.fullName,
-    this.onTabSwitch,
-    this.additionalInfo, // Added optional parameter
   });
 
   final Map<String, dynamic> user;
   final UserRole role;
   final String fullName;
-  final ValueChanged<int>? onTabSwitch;
-  final String? additionalInfo; // New field
 
   @override
   State<_HomeTab> createState() => _HomeTabState();
@@ -224,8 +220,8 @@ class _HomeTabState extends State<_HomeTab> {
         return _isEmpty(profile['domaine']) || _isEmpty(profile['objectif']);
       case UserRole.lyceen:
         return _isEmpty(profile['objectifPostbac']);
-      case UserRole.ecole:
       case UserRole.entreprise:
+      case UserRole.ecole:
         // Géré par profile_tab via fiche manquante
         return false;
     }
@@ -243,7 +239,6 @@ class _HomeTabState extends State<_HomeTab> {
     final user = widget.user;
     final role = widget.role;
     final fullName = widget.fullName;
-    final onTabSwitch = widget.onTabSwitch;
     final profile = resolveUserProfile(user);
     final welcomeName = fullName.trim().isEmpty ? 'sur REZO' : fullName.trim();
     final highlights = _buildHighlights(profile, role);
@@ -255,8 +250,7 @@ class _HomeTabState extends State<_HomeTab> {
 
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
-    final tagline = widget.additionalInfo ??
-        switch (role) {
+    final tagline = switch (role) {
           UserRole.etudiant =>
             'Explore des opportunités, complète ton profil et lance tes premiers matchs.',
           UserRole.lyceen =>
@@ -394,9 +388,7 @@ class _HomeTabState extends State<_HomeTab> {
 
         if (showCompleteBanner) ...[
           const SizedBox(height: 14),
-          _CompleteProfileBanner(
-            onTap: () => onTabSwitch?.call(0),
-          ),
+          const _CompleteProfileBanner(),
         ],
 
         // ── Stats row ───────────────────────────────────────────────
@@ -522,8 +514,7 @@ class _HomeTabState extends State<_HomeTab> {
 
 
 class _CompleteProfileBanner extends StatelessWidget {
-  const _CompleteProfileBanner({this.onTap});
-  final VoidCallback? onTap;
+  const _CompleteProfileBanner();
 
   @override
   Widget build(BuildContext context) {

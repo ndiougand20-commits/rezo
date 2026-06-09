@@ -127,7 +127,10 @@ class _SignupScreenState extends State<SignupScreen> {
       );
       Navigator.of(context).pushReplacementNamed(
         AppRoutes.login,
-        arguments: _emailController.text.trim(),
+        arguments: LoginRouteArgs(
+          initialEmail: _emailController.text.trim(),
+          selectedRole: _selectedRole,
+        ),
       );
     } on AuthException catch (error) {
       _showError(error.message);
@@ -225,7 +228,7 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget build(BuildContext context) {
     return AuthScaffold(
       showBackButton: false,
-      title: 'Créer un compte',
+      title: 'Créer un compte ${_selectedRole.label}',
       subtitle: 'Choisis ton rôle puis complète le formulaire adapté.',
       child: Form(
         key: _formKey,
@@ -305,7 +308,10 @@ class _SignupScreenState extends State<SignupScreen> {
             const SizedBox(height: 8),
             TextButton(
               onPressed: () {
-                Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+                Navigator.of(context).pushReplacementNamed(
+                  AppRoutes.login,
+                  arguments: LoginRouteArgs(selectedRole: _selectedRole),
+                );
               },
               child: const Text('J’ai déjà un compte'),
             ),

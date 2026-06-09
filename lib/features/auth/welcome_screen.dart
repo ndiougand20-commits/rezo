@@ -46,7 +46,10 @@ class WelcomeScreen extends StatelessWidget {
           const SizedBox(height: 28),
           ElevatedButton(
             onPressed: () {
-              Navigator.of(context).pushNamed(AppRoutes.login);
+              Navigator.of(context).pushNamed(
+                AppRoutes.login,
+                arguments: LoginRouteArgs(selectedRole: selectedRole),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black,

@@ -1,9 +1,14 @@
 part of 'auth_flow.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.initialEmail});
+  const LoginScreen({
+    super.key,
+    this.initialEmail,
+    this.selectedRole,
+  });
 
   final String? initialEmail;
+  final UserRole? selectedRole;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -67,8 +72,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedRole = widget.selectedRole;
     return AuthScaffold(
-      title: 'Connexion',
+      title: selectedRole == null
+          ? 'Connexion'
+          : 'Connexion ${selectedRole.label}',
       subtitle: 'Accède à ton espace en quelques secondes.',
       showBackButton: false,
       centerHeaderText: true,
@@ -154,7 +162,10 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: _loading
                   ? null
                   : () {
-                      Navigator.of(context).pushReplacementNamed(AppRoutes.signup);
+                      Navigator.of(context).pushReplacementNamed(
+                        AppRoutes.signup,
+                        arguments: selectedRole ?? UserRole.etudiant,
+                      );
                     },
               child: const Text('Créer un compte'),
             ),
