@@ -13,6 +13,7 @@ class _ReportTabState extends State<_ReportTab> {
   bool _loading = true;
   String? _error;
   Map<String, dynamic> _stats = const <String, dynamic>{};
+  DateTime? _lastRefreshAt;
 
   @override
   void didChangeDependencies() {
@@ -35,6 +36,7 @@ class _ReportTabState extends State<_ReportTab> {
       if (!mounted) return;
       setState(() {
         _stats = stats;
+        _lastRefreshAt = DateTime.now();
         _loading = false;
       });
     } on AuthException catch (e) {
@@ -53,6 +55,20 @@ class _ReportTabState extends State<_ReportTab> {
   }
 
   int _n(String key) => (_stats[key] as num?)?.toInt() ?? 0;
+
+  String _ratio(int numerator, int denominator) {
+    if (denominator <= 0) return '0%';
+    final value = ((numerator / denominator) * 100).round();
+    return '$value%';
+  }
+
+  String _lastRefreshLabel() {
+    final ts = _lastRefreshAt;
+    if (ts == null) return 'Mise à jour en attente';
+    final hh = ts.hour.toString().padLeft(2, '0');
+    final mm = ts.minute.toString().padLeft(2, '0');
+    return 'Mis à jour à $hh:$mm';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,21 +98,36 @@ class _ReportTabState extends State<_ReportTab> {
       );
     }
 
+    final matchCount = _n('matchCount');
+    final likesReceived = _n('likesReceived');
+    final likesSent = _n('likesSent');
+    final unreadMessages = _n('unreadMessages');
+    final offerCount = _n('offerCount');
+    final interactions = likesSent + likesReceived + matchCount;
     final cards = <_ReportCardData>[
       _ReportCardData(
         label: 'Matchs',
-        value: _n('matchCount').toString(),
+        value: '$matchCount',
         icon: Icons.favorite_rounded,
+        helper: 'Connexions mutuelles',
       ),
       _ReportCardData(
         label: 'Likes reçus',
-        value: _n('likesReceived').toString(),
+        value: '$likesReceived',
         icon: Icons.thumb_up_alt_rounded,
+        helper: 'Attractivité de ton profil',
       ),
       _ReportCardData(
         label: 'Messages non lus',
-        value: _n('unreadMessages').toString(),
+        value: '$unreadMessages',
         icon: Icons.mark_chat_unread_rounded,
+        helper: unreadMessages == 0 ? 'Boîte de réception saine' : 'À traiter rapidement',
+      ),
+      _ReportCardData(
+        label: 'Likes envoyés',
+        value: '$likesSent',
+        icon: Icons.outbound_rounded,
+        helper: 'Activité de prospection',
       ),
     ];
 
@@ -104,11 +135,35 @@ class _ReportTabState extends State<_ReportTab> {
       cards.add(
         _ReportCardData(
           label: 'Offres dispo',
-          value: _n('offerCount').toString(),
+          value: '$offerCount',
           icon: Icons.work_rounded,
+          helper: 'Opportunités publiées',
         ),
       );
     }
+
+    final insights = <String>[
+      'Taux de conversion likes envoyés -> matchs: ${_ratio(matchCount, likesSent)}',
+      'Part des messages en attente: ${_ratio(unreadMessages, (unreadMessages + matchCount + likesReceived).clamp(1, 1000000))}',
+      'Volume d’interactions: $interactions',
+      if (widget.role == UserRole.entreprise || widget.role == UserRole.ecole)
+        'Offres actives dans le pipeline: $offerCount',
+    ];
+
+    final quickActions = <String>[
+      if (unreadMessages > 0)
+        'Réponds à tes conversations non lues pour accélérer les matchs.',
+      if (likesSent == 0)
+        'Lance quelques likes ciblés pour amorcer de nouvelles opportunités.',
+      if (likesReceived > likesSent)
+        'Ton profil attire bien: pense à convertir ces signaux en échanges.',
+      if (widget.role == UserRole.entreprise || widget.role == UserRole.ecole)
+        offerCount == 0
+            ? 'Publie au moins une offre pour améliorer ta visibilité.'
+            : 'Mets à jour tes offres pour garder un flux de candidats pertinent.',
+      if (unreadMessages == 0 && likesSent > 0)
+        'Très bon rythme: maintiens cette cadence sur la semaine.',
+    ];
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -120,9 +175,18 @@ class _ReportTabState extends State<_ReportTab> {
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Vue synthétique de ton activité.',
-            style: TextStyle(color: Colors.black54),
+          Text(
+            'Vue détaillée de ton activité et de ta performance.',
+            style: TextStyle(color: Colors.black.withValues(alpha: 0.58)),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _lastRefreshLabel(),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.black.withValues(alpha: 0.46),
+            ),
           ),
           const SizedBox(height: 14),
           GridView.builder(
@@ -133,9 +197,31 @@ class _ReportTabState extends State<_ReportTab> {
               crossAxisCount: 2,
               mainAxisSpacing: 10,
               crossAxisSpacing: 10,
-              childAspectRatio: 1.2,
+              childAspectRatio: 1.08,
             ),
             itemBuilder: (_, i) => _ReportCard(data: cards[i]),
+          ),
+          const SizedBox(height: 16),
+          _ReportPanel(
+            title: 'Indicateurs avancés',
+            icon: Icons.analytics_outlined,
+            children: insights
+                .map((line) => _ReportBullet(text: line))
+                .toList(),
+          ),
+          const SizedBox(height: 10),
+          _ReportPanel(
+            title: 'Actions recommandées',
+            icon: Icons.bolt_rounded,
+            children: quickActions.isEmpty
+                ? const [
+                    _ReportBullet(
+                      text: 'Aucune alerte pour le moment. Continue sur ce rythme.',
+                    ),
+                  ]
+                : quickActions
+                      .map((line) => _ReportBullet(text: line))
+                      .toList(),
           ),
         ],
       ),
@@ -148,11 +234,13 @@ class _ReportCardData {
     required this.label,
     required this.value,
     required this.icon,
+    required this.helper,
   });
 
   final String label;
   final String value;
   final IconData icon;
+  final String helper;
 }
 
 class _ReportCard extends StatelessWidget {
@@ -190,6 +278,88 @@ class _ReportCard extends StatelessWidget {
           Text(
             data.label,
             style: const TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            data.helper,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 11, color: Colors.black45),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReportPanel extends StatelessWidget {
+  const _ReportPanel({
+    required this.title,
+    required this.icon,
+    required this.children,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE3E3E3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _ReportBullet extends StatelessWidget {
+  const _ReportBullet({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: Colors.black,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 13, height: 1.35),
+            ),
           ),
         ],
       ),

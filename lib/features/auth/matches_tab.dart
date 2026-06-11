@@ -36,6 +36,41 @@ class _MatchesTabState extends State<_MatchesTab> {
     'Communication',
   ];
 
+  String? _toAbsoluteMediaUrl(String? fileUrl) {
+    final raw = fileUrl?.trim() ?? '';
+    if (raw.isEmpty) return null;
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    return '${HttpAuthService.defaultBaseUrl}$raw';
+  }
+
+  String? _pickFirstImageUrl(Map<String, dynamic> source, {List<Map>? mediaFiles}) {
+    const keys = <String>[
+      'avatarUrl',
+      'photoUrl',
+      'imageUrl',
+      'logoUrl',
+      'profilePhotoUrl',
+      'ownerAvatarUrl',
+      'ownerPhotoUrl',
+    ];
+    for (final key in keys) {
+      final value = source[key]?.toString();
+      final absolute = _toAbsoluteMediaUrl(value);
+      if (absolute != null && absolute.isNotEmpty) return absolute;
+    }
+    if (mediaFiles != null) {
+      for (final raw in mediaFiles) {
+        final media = raw.cast<String, dynamic>();
+        final category = media['category']?.toString().toUpperCase() ?? '';
+        if (category == 'PHOTO' || category == 'AVATAR' || category == 'IMAGE') {
+          final absolute = _toAbsoluteMediaUrl(media['fileUrl']?.toString());
+          if (absolute != null && absolute.isNotEmpty) return absolute;
+        }
+      }
+    }
+    return null;
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -161,6 +196,7 @@ class _MatchesTabState extends State<_MatchesTab> {
       final owner = offer['ownerDisplayName']?.toString() ?? '—';
       final location = offer['location']?.toString() ?? '—';
       final type = offer['type']?.toString() ?? 'OPPORTUNITE';
+      final avatarUrl = _pickFirstImageUrl(offer) ?? _pickFirstImageUrl(item);
       result.add(_MatchItem(
         offerId: item['offerId']?.toString() ?? offer['id']?.toString(),
         title: offer['titre']?.toString() ?? 'Sans titre',
@@ -175,6 +211,7 @@ class _MatchesTabState extends State<_MatchesTab> {
         tags: tags,
         reasons: reasons,
         description: offer['description']?.toString() ?? '',
+        avatarUrl: avatarUrl,
       ));
       i++;
     }
@@ -204,6 +241,7 @@ class _MatchesTabState extends State<_MatchesTab> {
       final domaines = domainesRaw is List
           ? domainesRaw.map((e) => e.toString()).toList()
           : <String>[];
+      final avatarUrl = _pickFirstImageUrl(school) ?? _pickFirstImageUrl(item);
       result.add(_MatchItem(
         title: school['nomEtablissement']?.toString() ?? 'Ecole',
         subtitle:
@@ -218,6 +256,7 @@ class _MatchesTabState extends State<_MatchesTab> {
         tags: domaines.take(3).toList(),
         reasons: reasons,
         description: school['description']?.toString() ?? '',
+        avatarUrl: avatarUrl,
       ));
       i++;
     }
@@ -273,6 +312,7 @@ class _MatchesTabState extends State<_MatchesTab> {
         ...competences.take(3),
         ...docTags,
       ];
+      final avatarUrl = _pickFirstImageUrl(item, mediaFiles: media);
 
       result.add(_MatchItem(
         title: fullName,
@@ -288,6 +328,7 @@ class _MatchesTabState extends State<_MatchesTab> {
         reasons: reasons,
         description: item['objectif']?.toString() ?? '',
         targetUserId: item['userId']?.toString(),
+        avatarUrl: avatarUrl,
       ));
       i++;
     }
@@ -740,13 +781,40 @@ class _MatchesTabState extends State<_MatchesTab> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      _initials(match.title),
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.w900,
-                        color: Theme.of(context).colorScheme.primary,
+                    Container(
+                      width: 106,
+                      height: 106,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFFE0E0E0)),
                       ),
+                      clipBehavior: Clip.antiAlias,
+                      child: (match.avatarUrl != null && match.avatarUrl!.isNotEmpty)
+                          ? Image.network(
+                              match.avatarUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Center(
+                                child: Text(
+                                  _initials(match.title),
+                                  style: TextStyle(
+                                    fontSize: 34,
+                                    fontWeight: FontWeight.w900,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Center(
+                              child: Text(
+                                _initials(match.title),
+                                style: TextStyle(
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w900,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            ),
                     ),
                     const SizedBox(height: 8),
                     Padding(
@@ -1063,6 +1131,7 @@ class _MatchItem {
     required this.tags,
     required this.reasons,
     required this.description,
+    this.avatarUrl,
     this.offerId,
     this.targetUserId,
   });
@@ -1077,6 +1146,7 @@ class _MatchItem {
   final List<String> tags;
   final List<String> reasons;
   final String description;
+  final String? avatarUrl;
   final String? offerId;
   final String? targetUserId;
 }
@@ -1127,14 +1197,31 @@ class _MatchDetailSheet extends StatelessWidget {
                   border: Border.all(color: const Color(0xFFE0E0E0), width: 3),
                 ),
                 child: Center(
-                  child: Text(
-                    _initials(match.title),
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w800,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
+                  child: (match.avatarUrl != null && match.avatarUrl!.isNotEmpty)
+                      ? ClipOval(
+                          child: Image.network(
+                            match.avatarUrl!,
+                            width: 148,
+                            height: 148,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Text(
+                              _initials(match.title),
+                              style: TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.w800,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Text(
+                          _initials(match.title),
+                          style: TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w800,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
                 ),
               ),
             ),
