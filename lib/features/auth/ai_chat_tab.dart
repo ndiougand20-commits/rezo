@@ -4,7 +4,7 @@ part of 'auth_flow.dart';
 /// UI complète: check d'accès, historique local, écran upgrade,
 /// composer + bulles.
 class _AiChatTab extends StatefulWidget {
-  const _AiChatTab();
+  const _AiChatTab({super.key});
 
   @override
   State<_AiChatTab> createState() => _AiChatTabState();
@@ -78,10 +78,34 @@ class _AiChatTabState extends State<_AiChatTab> {
   }
 
   String _buildSessionId() {
-    final user = AppScope.of(context).currentUser ?? const <String, dynamic>{};
-    final id = user['id']?.toString() ?? 'anonymous';
-    final stamp = DateTime.now().millisecondsSinceEpoch;
-    return '$id-$stamp';
+    return _generateUuidV4();
+  }
+
+  bool _isValidUuid(String? value) {
+    if (value == null || value.trim().isEmpty) return false;
+    final trimmed = value.trim();
+    final regex = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}',
+    );
+    final match = regex.matchAsPrefix(trimmed);
+    return match != null && match.end == trimmed.length;
+  }
+
+  String _generateUuidV4() {
+    final random = math.Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+
+    // UUIDv4: version=4, variant=10xx
+    bytes[6] = (bytes[6] & 0x0F) | 0x40;
+    bytes[8] = (bytes[8] & 0x3F) | 0x80;
+
+    String hexByte(int b) => b.toRadixString(16).padLeft(2, '0');
+    final hex = bytes.map(hexByte).join();
+    return '${hex.substring(0, 8)}-'
+        '${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-'
+        '${hex.substring(16, 20)}-'
+        '${hex.substring(20, 32)}';
   }
 
   String _historyKey() {
@@ -145,7 +169,9 @@ class _AiChatTabState extends State<_AiChatTab> {
   Future<void> _send() async {
     final text = _inputController.text.trim();
     if (text.isEmpty || _waiting) return;
-    final sessionId = _currentSessionId ?? _buildSessionId();
+    final sessionId = _isValidUuid(_currentSessionId)
+        ? _currentSessionId!
+        : _buildSessionId();
     _currentSessionId = sessionId;
     final userMsg = _AiMessage(
       role: 'user',

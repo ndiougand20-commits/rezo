@@ -66,14 +66,90 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     final current = _visibleTabs[_currentIndex];
+
+    // Initiales pour l'avatar de profil
+    final initials = () {
+      final parts = fullName.trim().split(RegExp(r'\s+'));
+      if (parts.length >= 2) {
+        return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      }
+      return fullName.isNotEmpty ? fullName[0].toUpperCase() : 'P';
+    }();
+
+    final avatarUrl = user['avatarUrl']?.toString();
+
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(current.title),
+        toolbarHeight: 60,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFF0F0F0)),
+        ),
+        title: Row(
+          children: [
+            const Text(
+              'REZO',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 19,
+                letterSpacing: -0.5,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              current.title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w400,
+                fontSize: 15,
+                color: Color(0xFFAAAAAA),
+                letterSpacing: 0,
+              ),
+            ),
+          ],
+        ),
         actions: [
-          IconButton(
-            tooltip: 'Mon profil',
-            onPressed: goToProfile,
-            icon: const Icon(Icons.account_circle_rounded),
+          GestureDetector(
+            onTap: goToProfile,
+            child: Tooltip(
+              message: 'Mon profil',
+              child: Container(
+                margin: const EdgeInsets.only(right: 16),
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.black,
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: (avatarUrl != null && avatarUrl.isNotEmpty)
+                    ? Image.network(
+                        avatarUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Center(
+                          child: Text(
+                            initials,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Center(
+                        child: Text(
+                          initials,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+              ),
+            ),
           ),
         ],
       ),
@@ -83,24 +159,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 220),
           child: KeyedSubtree(
-            key: ValueKey(_currentIndex),
+            key: ValueKey(current.kind),
             child: current.widget,
           ),
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) =>
-            setState(() => _currentIndex = index),
-        destinations: _visibleTabs
-            .map(
-              (t) => NavigationDestination(
-                icon: Icon(t.icon),
-                selectedIcon: Icon(t.selectedIcon),
-                label: t.label,
-              ),
-            )
-            .toList(),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(height: 1, color: const Color(0xFFF0F0F0)),
+          NavigationBar(
+            selectedIndex: _currentIndex,
+            onDestinationSelected: (index) =>
+                setState(() => _currentIndex = index),
+            destinations: _visibleTabs
+                .map(
+                  (t) => NavigationDestination(
+                    icon: Icon(t.icon),
+                    selectedIcon: Icon(t.selectedIcon),
+                    label: t.label,
+                  ),
+                )
+                .toList(),
+          ),
+        ],
       ),
     );
   }
@@ -118,7 +200,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         label: 'Matching',
         icon: Icons.swipe_outlined,
         selectedIcon: Icons.swipe_rounded,
-        widget: const _MatchesTab(),
+        widget: const _MatchesTab(key: PageStorageKey('matching_tab')),
       ),
       _TabSpec(
         kind: _TabKind.messages,
@@ -126,7 +208,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         label: 'Messages',
         icon: Icons.forum_outlined,
         selectedIcon: Icons.forum_rounded,
-        widget: const _MessagesTab(),
+        widget: const _MessagesTab(key: PageStorageKey('messages_tab')),
       ),
       _TabSpec(
         kind: _TabKind.report,
@@ -134,18 +216,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         label: 'Rapport',
         icon: Icons.insights_outlined,
         selectedIcon: Icons.insights_rounded,
-        widget: _ReportTab(role: role),
+        widget: _ReportTab(role: role, key: PageStorageKey('report_tab')),
       ),
     ];
 
     if (role == UserRole.ecole || role == UserRole.entreprise) {
-      tabs.add(const _TabSpec(
+      tabs.add(_TabSpec(
         kind: _TabKind.offers,
         title: 'Mes offres',
         label: 'Offres',
         icon: Icons.work_outline_rounded,
         selectedIcon: Icons.work_rounded,
-        widget: _OffersTab(),
+        widget: const _OffersTab(key: PageStorageKey('offers_tab')),
       ));
     }
 
@@ -156,7 +238,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         label: 'IA',
         icon: Icons.smart_toy_outlined,
         selectedIcon: Icons.smart_toy_rounded,
-        widget: _AiChatTab(),
+        widget: _AiChatTab(key: PageStorageKey('aichat_tab')),
       ));
     }
 

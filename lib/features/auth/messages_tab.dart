@@ -1,7 +1,7 @@
 part of 'auth_flow.dart';
 
 class _MessagesTab extends StatefulWidget {
-  const _MessagesTab();
+  const _MessagesTab({super.key});
 
   @override
   State<_MessagesTab> createState() => _MessagesTabState();

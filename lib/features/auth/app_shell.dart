@@ -65,26 +65,47 @@ class _RezoAppState extends State<RezoApp> {
             inversePrimary: Color(0xFFBDBDBD),
             surfaceTint: Colors.transparent,
           ),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            surfaceTintColor: Colors.transparent,
+            titleTextStyle: TextStyle(
+              color: Colors.black,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+            iconTheme: IconThemeData(color: Colors.black),
+            actionsIconTheme: IconThemeData(color: Colors.black),
+          ),
           navigationBarTheme: NavigationBarThemeData(
             backgroundColor: Colors.white,
-            indicatorColor: const Color(0xFFE0E0E0),
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            height: 64,
+            indicatorColor: Colors.black,
+            indicatorShape: const StadiumBorder(),
             iconTheme: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.selected)) {
-                return const IconThemeData(color: Colors.black);
+                return const IconThemeData(color: Colors.white, size: 22);
               }
-              return const IconThemeData(color: Color(0xFF757575));
+              return const IconThemeData(color: Color(0xFFAAAAAA), size: 22);
             }),
             labelTextStyle: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.selected)) {
                 return const TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: Colors.black,
+                  letterSpacing: 0.1,
                 );
               }
               return const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF757575),
+                fontSize: 11,
+                fontWeight: FontWeight.w400,
+                color: Color(0xFFAAAAAA),
+                letterSpacing: 0.1,
               );
             }),
           ),

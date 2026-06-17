@@ -1,7 +1,10 @@
 part of 'auth_flow.dart';
 
 class _ReportTab extends StatefulWidget {
-  const _ReportTab({required this.role});
+  const _ReportTab({
+    required this.role,
+    super.key,
+  });
 
   final UserRole role;
 

@@ -1,7 +1,7 @@
 part of 'auth_flow.dart';
 
 class _MatchesTab extends StatefulWidget {
-  const _MatchesTab();
+  const _MatchesTab({super.key});
 
   @override
   State<_MatchesTab> createState() => _MatchesTabState();
@@ -49,6 +49,7 @@ class _MatchesTabState extends State<_MatchesTab> {
       'photoUrl',
       'imageUrl',
       'logoUrl',
+      'ownerLogoUrl',
       'profilePhotoUrl',
       'ownerAvatarUrl',
       'ownerPhotoUrl',
@@ -71,6 +72,8 @@ class _MatchesTabState extends State<_MatchesTab> {
     return null;
   }
 
+  static const _introSeenKey = 'matching_intro_seen';
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -78,7 +81,7 @@ class _MatchesTabState extends State<_MatchesTab> {
       _introScheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _showMatchingIntro();
+        _maybeShowMatchingIntro();
       });
     }
     if (!_dataLoadScheduled) {
@@ -88,6 +91,14 @@ class _MatchesTabState extends State<_MatchesTab> {
         _loadRecommendations();
       });
     }
+  }
+
+  Future<void> _maybeShowMatchingIntro() async {
+    final prefs = await SharedPreferences.getInstance();
+    final alreadySeen = prefs.getBool(_introSeenKey) ?? false;
+    if (!mounted || alreadySeen) return;
+    await _showMatchingIntro();
+    await prefs.setBool(_introSeenKey, true);
   }
 
   Future<void> _loadRecommendations({bool includeSwiped = false}) async {
@@ -140,6 +151,10 @@ class _MatchesTabState extends State<_MatchesTab> {
         } else {
           _trace = null;
         }
+      }
+      if (mapped.isEmpty && !includeSwiped && _canReplay(role)) {
+        if (!mounted) return;
+        return _loadRecommendations(includeSwiped: true);
       }
       if (!mounted) return;
       setState(() {
@@ -197,6 +212,9 @@ class _MatchesTabState extends State<_MatchesTab> {
       final location = offer['location']?.toString() ?? '—';
       final type = offer['type']?.toString() ?? 'OPPORTUNITE';
       final avatarUrl = _pickFirstImageUrl(offer) ?? _pickFirstImageUrl(item);
+      // fallback : chercher dans l'objet owner imbriqué si présent
+      final ownerMap = (item['owner'] as Map?)?.cast<String, dynamic>();
+      final resolvedAvatarUrl = avatarUrl ?? (ownerMap != null ? _pickFirstImageUrl(ownerMap) : null);
       result.add(_MatchItem(
         offerId: item['offerId']?.toString() ?? offer['id']?.toString(),
         title: offer['titre']?.toString() ?? 'Sans titre',
@@ -211,7 +229,7 @@ class _MatchesTabState extends State<_MatchesTab> {
         tags: tags,
         reasons: reasons,
         description: offer['description']?.toString() ?? '',
-        avatarUrl: avatarUrl,
+        avatarUrl: resolvedAvatarUrl,
       ));
       i++;
     }
@@ -582,6 +600,10 @@ class _MatchesTabState extends State<_MatchesTab> {
 
     final hasCurrent = _currentIndex < recommendations.length;
     final current = hasCurrent ? recommendations[_currentIndex] : null;
+    final prev = _currentIndex > 0 ? recommendations[_currentIndex - 1] : null;
+    final next = _currentIndex + 1 < recommendations.length
+        ? recommendations[_currentIndex + 1]
+        : null;
     return Column(
       children: [
         if (role == UserRole.lyceen)
@@ -589,7 +611,7 @@ class _MatchesTabState extends State<_MatchesTab> {
         // Swipe area
         Expanded(
           child: current != null
-              ? _buildSwipeCard(current, recommendations.length)
+              ? _buildSwipeStack(current, prev, next, recommendations.length)
               : _buildSessionEnd(recommendations.length),
         ),
 
@@ -725,6 +747,131 @@ class _MatchesTabState extends State<_MatchesTab> {
             icon: const Icon(Icons.close_rounded, size: 18),
             onPressed: () => setState(() => _suggestedPackDismissed = true),
             tooltip: 'Masquer',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSwipeStack(
+    _MatchItem current,
+    _MatchItem? prev,
+    _MatchItem? next,
+    int total,
+  ) {
+    // L'amplitude du drag (0..1) réduit la carte arrière au fur et à mesure
+    final dragProgress = (_dragOffset.dx.abs() / 150).clamp(0.0, 1.0);
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // ── Bulle précédente (derrière, à gauche) ──
+        if (prev != null)
+          Positioned(
+            left: 0,
+            child: Opacity(
+              opacity: (0.45 + dragProgress * 0.35).clamp(0.0, 0.8),
+              child: Transform.scale(
+                scale: 0.72 + dragProgress * 0.06,
+                child: _buildCardBubble(prev),
+              ),
+            ),
+          ),
+
+        // ── Bulle suivante (derrière, à droite) ──
+        if (next != null)
+          Positioned(
+            right: 0,
+            child: Opacity(
+              opacity: (0.45 + dragProgress * 0.35).clamp(0.0, 0.8),
+              child: Transform.scale(
+                scale: 0.72 + dragProgress * 0.06,
+                child: _buildCardBubble(next),
+              ),
+            ),
+          ),
+
+        // ── Carte principale (au premier plan) ──
+        _buildSwipeCard(current, total),
+      ],
+    );
+  }
+
+  /// Rendu simplifié d'une bulle de fond (sans interaction).
+  Widget _buildCardBubble(_MatchItem match) {
+    return Container(
+      width: 200,
+      height: 200,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [
+            match.accent,
+            Theme.of(context).colorScheme.primaryContainer,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: const Color(0xFFE0E0E0), width: 2.5),
+        boxShadow: [
+          BoxShadow(
+            color: match.accent.withAlpha(40),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 74,
+            height: 74,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              border: Border.all(color: const Color(0xFFE0E0E0)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: (match.avatarUrl != null && match.avatarUrl!.isNotEmpty)
+                ? Image.network(
+                    match.avatarUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Center(
+                      child: Text(
+                        _initials(match.title),
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      _initials(match.title),
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              match.title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),

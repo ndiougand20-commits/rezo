@@ -1,7 +1,7 @@
 part of 'auth_flow.dart';
 
 class _OffersTab extends StatefulWidget {
-  const _OffersTab();
+  const _OffersTab({super.key});
 
   @override
   State<_OffersTab> createState() => _OffersTabState();
@@ -202,7 +202,8 @@ class _OffersTabState extends State<_OffersTab> {
     try {
       final data = await AppScope.of(context).getOfferLikedBy(id);
       if (!mounted) return;
-      final users = (data['users'] as List?) ??
+      final users = (data['likers'] as List?) ??
+          (data['users'] as List?) ??
           (data['items'] as List?) ??
           const <dynamic>[];
       await showModalBottomSheet(
@@ -479,13 +480,19 @@ class _LikedByList extends StatelessWidget {
                     name.isNotEmpty ? name : (u['email']?.toString() ?? '—');
                 final initial =
                     display.isNotEmpty ? display[0].toUpperCase() : '?';
+                final avatarUrl = u['avatarUrl']?.toString();
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
                     backgroundColor: const Color(0xFFF0F0F0),
-                    child: Text(initial,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700)),
+                    backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
+                        ? NetworkImage(avatarUrl)
+                        : null,
+                    child: (avatarUrl == null || avatarUrl.isEmpty)
+                        ? Text(initial,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700))
+                        : null,
                   ),
                   title: Text(display),
                   subtitle: Text(u['role']?.toString() ?? ''),
