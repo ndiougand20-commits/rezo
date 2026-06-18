@@ -55,6 +55,12 @@ class FakeAuthService implements AuthService {
   }
 
   @override
+  Future<void> refreshSession() async {}
+
+  @override
+  Future<void> logout({String? refreshToken}) async {}
+
+  @override
   Future<void> signup(Map<String, dynamic> payload) async {
     if (shouldFailSignup) {
       throw AuthException('Cet email est déjà utilisé', statusCode: 409);

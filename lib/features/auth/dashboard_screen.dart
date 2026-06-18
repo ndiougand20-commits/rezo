@@ -193,23 +193,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required UserRole role,
     required String fullName,
   }) {
+    final canViewMatching = _canUseFeature(
+      user: user,
+      directKeys: const ['canViewOpportunities', 'canUseMatching'],
+      packFlags: const ['MATCHING_BASIC', 'MATCHING_ADVANCED', 'MATCHING_PREMIUM'],
+      fallback: true,
+    );
+    final canUseMessaging = _canUseFeature(
+      user: user,
+      directKeys: const ['canUseMessaging'],
+      packFlags: const ['MESSAGERIE_LIMITEE', 'MESSAGERIE_ILLIMITEE'],
+      fallback: true,
+    );
+    final canManageOffers = _canUseFeature(
+      user: user,
+      directKeys: const ['canManageOffers'],
+      packFlags: const ['OFFERS_PUBLISH'],
+      fallback: role == UserRole.ecole || role == UserRole.entreprise,
+    );
+    final canUseAiChat = _canUseFeature(
+      user: user,
+      directKeys: const ['canUseAiChat'],
+      packFlags: const ['AI_CHAT_ACCESS'],
+      fallback: false,
+    );
+
     final tabs = <_TabSpec>[
-      _TabSpec(
-        kind: _TabKind.matching,
-        title: 'Matching',
-        label: 'Matching',
-        icon: Icons.swipe_outlined,
-        selectedIcon: Icons.swipe_rounded,
-        widget: const _MatchesTab(key: PageStorageKey('matching_tab')),
-      ),
-      _TabSpec(
-        kind: _TabKind.messages,
-        title: 'Messages',
-        label: 'Messages',
-        icon: Icons.forum_outlined,
-        selectedIcon: Icons.forum_rounded,
-        widget: const _MessagesTab(key: PageStorageKey('messages_tab')),
-      ),
       _TabSpec(
         kind: _TabKind.report,
         title: 'Rapport',
@@ -220,7 +229,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     ];
 
-    if (role == UserRole.ecole || role == UserRole.entreprise) {
+    if (canViewMatching) {
+      tabs.insert(
+        0,
+        const _TabSpec(
+          kind: _TabKind.matching,
+          title: 'Matching',
+          label: 'Matching',
+          icon: Icons.swipe_outlined,
+          selectedIcon: Icons.swipe_rounded,
+          widget: _MatchesTab(key: PageStorageKey('matching_tab')),
+        ),
+      );
+    }
+
+    if (canUseMessaging) {
+      tabs.add(
+        const _TabSpec(
+          kind: _TabKind.messages,
+          title: 'Messages',
+          label: 'Messages',
+          icon: Icons.forum_outlined,
+          selectedIcon: Icons.forum_rounded,
+          widget: _MessagesTab(key: PageStorageKey('messages_tab')),
+        ),
+      );
+    }
+
+    if ((role == UserRole.ecole || role == UserRole.entreprise) &&
+        canManageOffers) {
       tabs.add(_TabSpec(
         kind: _TabKind.offers,
         title: 'Mes offres',
@@ -231,7 +268,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ));
     }
 
-    if (user['canUseAiChat'] == true) {
+    if (canUseAiChat) {
       tabs.add(const _TabSpec(
         kind: _TabKind.aiChat,
         title: 'Chat IA',
@@ -243,6 +280,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return tabs;
+  }
+
+  bool _canUseFeature({
+    required Map<String, dynamic> user,
+    required List<String> directKeys,
+    required List<String> packFlags,
+    required bool fallback,
+  }) {
+    for (final key in directKeys) {
+      final raw = user[key];
+      if (raw is bool) return raw;
+      if (raw is String) {
+        final normalized = raw.trim().toLowerCase();
+        if (normalized == 'true') return true;
+        if (normalized == 'false') return false;
+      }
+      if (raw is num) return raw != 0;
+    }
+
+    final features = _packFeatures(user);
+    if (features.isNotEmpty) {
+      for (final flag in packFlags) {
+        if (features.contains(flag)) return true;
+      }
+      return false;
+    }
+
+    return fallback;
+  }
+
+  Set<String> _packFeatures(Map<String, dynamic> user) {
+    final raw = user['packFeatures'];
+    if (raw is List) {
+      return raw
+          .map((item) => item.toString().trim().toUpperCase())
+          .where((item) => item.isNotEmpty)
+          .toSet();
+    }
+    return <String>{};
   }
 }
 

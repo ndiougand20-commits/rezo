@@ -72,7 +72,12 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    await _tokenStorage.clearToken();
+    try {
+      final refreshToken = await _tokenStorage.readRefreshToken();
+      await _authService.logout(refreshToken: refreshToken);
+    } catch (_) {
+      await _tokenStorage.clearToken();
+    }
     _reset();
     notifyListeners();
   }
@@ -115,16 +120,34 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<List<Map<String, dynamic>>> fetchPacks() {
-    return _authService.getPacks();
+  Future<List<Map<String, dynamic>>> fetchPacks() async {
+    try {
+      return await _authService.getPacks();
+    } on AuthException catch (error) {
+      await _clearSessionIfUnauthorized(error);
+      notifyListeners();
+      rethrow;
+    }
   }
 
-  Future<List<Map<String, dynamic>>> fetchMessages() {
-    return _authService.getMessages();
+  Future<List<Map<String, dynamic>>> fetchMessages() async {
+    try {
+      return await _authService.getMessages();
+    } on AuthException catch (error) {
+      await _clearSessionIfUnauthorized(error);
+      notifyListeners();
+      rethrow;
+    }
   }
 
-  Future<List<Map<String, dynamic>>> fetchOffers() {
-    return _authService.getOffers();
+  Future<List<Map<String, dynamic>>> fetchOffers() async {
+    try {
+      return await _authService.getOffers();
+    } on AuthException catch (error) {
+      await _clearSessionIfUnauthorized(error);
+      notifyListeners();
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> uploadProfilePhoto({

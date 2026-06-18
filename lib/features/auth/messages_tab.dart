@@ -8,6 +8,8 @@ class _MessagesTab extends StatefulWidget {
 }
 
 class _MessagesTabState extends State<_MessagesTab> {
+  static const int _conversationPageSize = 12;
+
   List<_Conversation>? _conversations;
   Set<String> _matchedUserIds = <String>{};
   Map<String, _MatchedMeta> _matchedMetaByUserId = <String, _MatchedMeta>{};
@@ -16,6 +18,8 @@ class _MessagesTabState extends State<_MessagesTab> {
   _Conversation? _selected;
   bool? _messagingAllowed;
   String? _messagingDeniedReason;
+  int _conversationPage = 0;
+  Timer? _pollingTimer;
 
   @override
   void didChangeDependencies() {
@@ -23,6 +27,12 @@ class _MessagesTabState extends State<_MessagesTab> {
     if (_conversations == null && _isLoading) {
       _bootstrap();
     }
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _bootstrap() async {
@@ -35,6 +45,16 @@ class _MessagesTabState extends State<_MessagesTab> {
     await _loadMutualMatches();
     if (!mounted) return;
     await _loadConversations();
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!mounted) return;
+      if (_isLoading || _selected != null) return;
+      unawaited(_loadConversations());
+    });
   }
 
   Future<void> _loadMutualMatches() async {
@@ -131,6 +151,7 @@ class _MessagesTabState extends State<_MessagesTab> {
       if (!mounted) return;
       setState(() {
         _conversations = grouped;
+        _conversationPage = 0;
         _isLoading = false;
       });
     } on AuthException catch (e) {
@@ -261,6 +282,10 @@ class _MessagesTabState extends State<_MessagesTab> {
     }
 
     final conversations = _conversations ?? const <_Conversation>[];
+    final visibleCount =
+      ((_conversationPage + 1) * _conversationPageSize).clamp(0, conversations.length);
+    final visibleConversations = conversations.take(visibleCount).toList();
+    final hasMoreConversations = visibleCount < conversations.length;
 
     if (_selected != null) {
       return _ConversationDetailView(
@@ -295,10 +320,29 @@ class _MessagesTabState extends State<_MessagesTab> {
       onRefresh: _loadConversations,
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
-        itemCount: conversations.length,
-        separatorBuilder: (_, _) => const Divider(height: 1),
+        itemCount: visibleConversations.length + (hasMoreConversations ? 1 : 0),
+        separatorBuilder: (_, index) {
+          if (index >= visibleConversations.length - 1) {
+            return const SizedBox(height: 10);
+          }
+          return const Divider(height: 1);
+        },
         itemBuilder: (context, index) {
-          final conv = conversations[index];
+          if (index == visibleConversations.length && hasMoreConversations) {
+            final remaining = conversations.length - visibleConversations.length;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Center(
+                child: OutlinedButton.icon(
+                  onPressed: () => setState(() => _conversationPage += 1),
+                  icon: const Icon(Icons.expand_more_rounded),
+                  label: Text('Voir plus ($remaining restantes)'),
+                ),
+              ),
+            );
+          }
+
+          final conv = visibleConversations[index];
           final preview = conv.isSynthetic
             ? conv.lastMessage
             : conv.lastIsFromMe
@@ -524,10 +568,13 @@ class _ConversationDetailView extends StatefulWidget {
 }
 
 class _ConversationDetailViewState extends State<_ConversationDetailView> {
+  static const int _historyPageSize = 30;
+
   List<Map<String, dynamic>> _messages = const <Map<String, dynamic>>[];
   bool _isLoading = true;
   String? _error;
   bool _isSending = false;
+  int _historyPage = 0;
   final TextEditingController _composer = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -566,6 +613,7 @@ class _ConversationDetailViewState extends State<_ConversationDetailView> {
       if (!mounted) return;
       setState(() {
         _messages = messages;
+        _historyPage = 0;
         _isLoading = false;
       });
       _scrollToBottom();
@@ -608,6 +656,16 @@ class _ConversationDetailViewState extends State<_ConversationDetailView> {
   }
 
   Future<void> _sendMessage() async {
+    if (!widget.conversation.isMatch) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vous devez avoir un match mutuel pour envoyer un message.'),
+        ),
+      );
+      return;
+    }
+
     final text = _composer.text.trim();
     if (text.isEmpty || _isSending) return;
     setState(() => _isSending = true);
@@ -657,8 +715,17 @@ class _ConversationDetailViewState extends State<_ConversationDetailView> {
 
   @override
   Widget build(BuildContext context) {
+    final canCompose = widget.conversation.isMatch;
     final myId =
         AppScope.of(context).currentUser?['id']?.toString() ?? '';
+    final totalMessages = _messages.length;
+    final startIndex =
+      (totalMessages - ((_historyPage + 1) * _historyPageSize)).clamp(0, totalMessages);
+    final visibleMessages = totalMessages == 0
+      ? const <Map<String, dynamic>>[]
+      : _messages.sublist(startIndex, totalMessages);
+    final hasOlderMessages = startIndex > 0;
+
     return Column(
       children: [
         Container(
@@ -739,9 +806,23 @@ class _ConversationDetailViewState extends State<_ConversationDetailView> {
                       : ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.all(16),
-                      itemCount: _messages.length,
+                      itemCount: visibleMessages.length + (hasOlderMessages ? 1 : 0),
                       itemBuilder: (context, i) {
-                        final m = _messages[i];
+                        if (hasOlderMessages && i == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Center(
+                              child: OutlinedButton.icon(
+                                onPressed: () => setState(() => _historyPage += 1),
+                                icon: const Icon(Icons.history_rounded),
+                                label: Text('Charger plus anciens ($startIndex)'),
+                              ),
+                            ),
+                          );
+                        }
+
+                        final messageIndex = hasOlderMessages ? i - 1 : i;
+                        final m = visibleMessages[messageIndex];
                         final isMe =
                             (m['senderId']?.toString() ?? '') == myId;
                         return _MessageBubble(
@@ -760,44 +841,72 @@ class _ConversationDetailViewState extends State<_ConversationDetailView> {
               top: BorderSide(color: Theme.of(context).dividerColor),
             ),
           ),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _composer,
-                  enabled: !_isSending,
-                  minLines: 1,
-                  maxLines: 4,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _sendMessage(),
-                  decoration: InputDecoration(
-                    hintText: '\u00c9crire un message\u2026',
-                    filled: true,
-                    fillColor: const Color(0xFFF5F5F5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
+              if (!canCompose)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8E1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFFE082)),
+                  ),
+                  child: const Text(
+                    'Envoi indisponible: match mutuel requis.',
+                    style: TextStyle(
+                      color: Color(0xFF8D6E63),
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: _isSending ? null : _sendMessage,
-                icon: _isSending
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        Icons.send_rounded,
-                        color: Theme.of(context).colorScheme.primary,
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _composer,
+                      enabled: canCompose && !_isSending,
+                      minLines: 1,
+                      maxLines: 4,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _sendMessage(),
+                      decoration: InputDecoration(
+                        hintText: canCompose
+                            ? '\u00c9crire un message\u2026'
+                            : 'Match requis pour discuter',
+                        filled: true,
+                        fillColor: const Color(0xFFF5F5F5),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                       ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: (canCompose && !_isSending) ? _sendMessage : null,
+                    icon: _isSending
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            Icons.send_rounded,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                  ),
+                ],
               ),
             ],
           ),

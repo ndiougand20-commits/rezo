@@ -18,7 +18,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _useVideo = !kIsWeb && defaultTargetPlatform != TargetPlatform.android;
+    _useVideo = !kIsWeb;
     if (_useVideo) {
       _videoController = VideoPlayerController.asset(
         'assets/splashscreen/splashscreen.mp4',
